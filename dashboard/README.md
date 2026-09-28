@@ -124,3 +124,15 @@ quasi-steady and equal the source power. Stores hold energy
 E = C × (T − T_room); watts are only their charge or discharge rate. Only live,
 safety-relevant status is flagged on screen: stale data, missing status,
 missing sensors and closeness to target or abort.
+
+**Motion.**
+- Each heat-flow line and the neck carries a colour band that rolls downstream. Its colours
+  come only from the temperature scale between the line's two ends (at least 6 K wide), and
+  it moves a little faster with more watts.
+- The heatpipe's dashes creep from the NIC plate into the fin block. Its power is unknown,
+  so it carries no temperature colour.
+- The fans turn once per second at full speed (13,500 rpm), proportional to the measured
+  rpm.
+- All motion is SVG (SMIL) with no extra script. The phase follows the wall clock, so the
+  2 s redraw continues the motion instead of restarting it.
+- With the operating system's "reduce motion" setting, the view is static.
