@@ -1087,9 +1087,9 @@
          [Fa.right, state.fan.rightRpm, 'right · CPU/GPU', `fast · rpm[${K.fanRightFastIdx}]`]].forEach(([cx, rpmV, where, speed]) => {
           const r = Fa.r, cyF = Fa.cy;
           let fanSvg = `<g><title>${esc(`Fan ${where}: ${fmt(rpmV, 0)} rpm (${speed}; mapping from the RPM)`)}</title><circle class="tw-fan" cx="${cx}" cy="${cyF}" r="${r}"/>`;
-          const shown = num(rpmV) === null ? 0 : 2 * Math.max(0, rpmV) / 13500;   // display rpm: 2 at 13,500 rpm
+          const shown = num(rpmV) === null ? 0 : Math.max(0, rpmV) / 13500;   // display: 1 turn per second at 13,500 rpm
           fanSvg += '<g>' + (motion && shown > 0.02
-            ? `<animateTransform attributeName="transform" type="rotate" from="0 ${cx} ${cyF}" to="360 ${cx} ${cyF}" dur="${(60 / shown).toFixed(1)}s" begin="${begin(60 / shown)}" repeatCount="indefinite"/>` : '');
+            ? `<animateTransform attributeName="transform" type="rotate" from="0 ${cx} ${cyF}" to="360 ${cx} ${cyF}" dur="${(1 / shown).toFixed(2)}s" begin="${begin(1 / shown)}" repeatCount="indefinite"/>` : '');
           for (let k = 0; k < 4; k++) {
             fanSvg += `<ellipse cx="${cx}" cy="${cyF - r * 0.45}" rx="${(r * 0.2).toFixed(1)}" ry="${(r * 0.42).toFixed(1)}" transform="rotate(${k * 90 + 25} ${cx} ${cyF})" fill="#83a8ff" fill-opacity=".55"/>`;
           }
