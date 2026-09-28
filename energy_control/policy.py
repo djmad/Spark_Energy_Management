@@ -41,6 +41,8 @@ def _tunable_value(settings, name):
              "gpu_zone_derivative_tau_s": "derivative_tau"}
     if name in gains:
         return getattr(settings.gpu_zone_gains, gains[name])
+    if name == "prefill_rearm":
+        return 1.0 if settings.prefill_rearm else 0.0
     return getattr(settings, name)
 
 
@@ -154,6 +156,8 @@ class ShadowPolicy:
         zone = {key: tuning.pop(name) for name, key in (
             ("gpu_zone_kp", "kp"), ("gpu_zone_ki", "ki"), ("gpu_zone_kd", "kd"),
             ("gpu_zone_derivative_tau_s", "derivative_tau")) if name in tuning}
+        if "prefill_rearm" in tuning:    # a switch as a live tunable: >= 0.5 on
+            tuning["prefill_rearm"] = tuning["prefill_rearm"] >= 0.5
         settings = ShadowPolicy._base_settings(config, wind_down)
         if zone:
             tuning["gpu_zone_gains"] = replace(settings.gpu_zone_gains, **zone)

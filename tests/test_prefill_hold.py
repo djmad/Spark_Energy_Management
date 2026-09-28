@@ -16,6 +16,8 @@ class PrefillHoldTests(unittest.TestCase):
         hold = PrefillHold(receipts.get, lambda: "engine-a", run_id="ab" * 16,
                            engine_epoch="engine-a", clock=lambda: current[0])
         cycle, _, gpu, _, _ = fixtures.UnifiedActuationTests().setup_cycle()
+        # REARM on prefill is off in production (28 Sep); owned trials switch it on.
+        cycle.config = replace(cycle.config, tuning={"prefill_rearm": 1.0})
         controller = UnifiedController(ShadowPolicy(cycle.config), cycle, prefill_hold=hold)
         def sample(now):
             current[0] = now

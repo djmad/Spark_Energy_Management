@@ -26,8 +26,8 @@ class PredictiveFanTests(unittest.TestCase):
     def test_idle_steps_down_gently_to_the_floor(self):
         controller = Supervisor(settings())
         controller.fan_state = 12
-        levels = [run(controller, 15).fan_state for _ in range(12)]
-        self.assertEqual(levels[0], 11)                  # one level per 15 s dwell
+        levels = [run(controller, 60).fan_state for _ in range(12)]
+        self.assertEqual(levels[0], 11)                  # one level per 60 s (fan_release_step_s)
         self.assertEqual(levels[-1], 2)
         self.assertTrue(all(a - b in (0, 1) for a, b in zip(levels, levels[1:])))
 

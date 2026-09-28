@@ -230,6 +230,14 @@ class Settings:
     fan_release_headroom: float = 0.75
     # False only once idle -> 100 % at the maximum is qualified with margin.
     entry_fallback: bool = True
+    # REARM to the entry ceiling on each new prefill. Off (operator, 28 September
+    # 2026: "we detect load only on GPU utilisation, prefill we don't need to
+    # look at any more; example is our burn-in test"). Every prompt that joined a
+    # running decode dropped the cap to the entry ceiling for ~8 s, and the
+    # prefill burst itself already ran at full clock (vLLM counters are read at
+    # 1 Hz). Cold starts keep the entry ceiling: the idle cooldown returns the cap
+    # to it, and the ramp starts only at busy utilisation.
+    prefill_rearm: bool = False
     emergency_hysteresis_c: float = 5.0
     emergency_recovery_s: float = 10.0
     # Fan policy (doc/48 §0, D1). "load": the floor sits at fan_load_state
@@ -265,7 +273,11 @@ class Settings:
     # the matrix-load power at the current cap for fan_anticipate_s, then the
     # measured power (peak-held, decaying with fan_power_decay_s).
     fan_anticipate_s: float = 30.0
-    fan_power_decay_s: float = 60.0
+    fan_power_decay_s: float = 300.0  # peak-hold of the expected power: bursts every 1-5 min keep the fan up
+    # One level down per fan_release_step_s (operator, 28 September 2026: the
+    # release to lower speeds was too aggressive: 12 -> 6 within 90 s between
+    # prefill bursts, a sawtooth). 60 s: 12 -> 6 takes 6 min.
+    fan_release_step_s: float = 60.0
     # Operator per-cluster maxima (E0, P0, E1, P1) as ratios of each class's
     # hardware span; each cluster loop treats its value as a bound, so a raise
     # ramps in the loop's controlled way and a reduction applies at once.
@@ -388,7 +400,8 @@ class Settings:
         if not 0 < self.idle_util_threshold < self.busy_threshold:
             raise ValueError("idle utilisation threshold must lie below the busy threshold")
         if not all(isfinite(v) and v > 0 for v in (
-                self.fan_neck_w_k, self.fan_air_g0_w_k, self.fan_air_g1_w_k, self.fan_power_decay_s)) \
+                self.fan_neck_w_k, self.fan_air_g0_w_k, self.fan_air_g1_w_k, self.fan_power_decay_s,
+                self.fan_release_step_s)) \
                 or not 0 <= self.fan_fb_full_c < self.fan_fb_band_c or self.fan_anticipate_s < 0 \
                 or self.fan_background_w < 0 or not self.fan_room_c < self.fan_plate_target_c:
             raise ValueError("invalid predictive fan settings")
@@ -724,7 +737,7 @@ class Supervisor:
         # blip of 20 % utilisation is no load (live, 27 September 2026).
         start = gpu_active and not self.fan_gpu_was_active
         self.fan_gpu_was_active = gpu_active
-        if start or o.prefill_arrival or o.model_loading:
+        if start or o.model_loading:
             self.fan_anticipate_left_s = s.fan_anticipate_s
         self.fan_anticipate_left_s = max(0.0, self.fan_anticipate_left_s - dt)
         # The peak-hold smooths the measured power only; the anticipation is
@@ -761,7 +774,7 @@ class Supervisor:
             self.fan_state, self.fan_down_s = target, 0.0
         else:
             self.fan_down_s += dt
-            if self.fan_down_s >= s.fan_down_dwell_s:
+            if self.fan_down_s >= s.fan_release_step_s:
                 self.fan_state, self.fan_down_s = self.fan_state - 1, 0.0
         self.fan_state = max(s.fan_min_state, min(12, self.fan_state))
         self.fan_info = {"expected_w": round(expected, 1), "feed": feed, "feedback": back,
@@ -773,8 +786,7 @@ class Supervisor:
         s = self.s
         # The GPU workload: LLM work (prefill, loading, queued jobs) or any busy
         # GPU (burn-in, other GPU jobs) when the queue is unknown.
-        gpu_load = (o.prefill_arrival or o.model_loading
-                    or (o.active_jobs > 0 if o.active_jobs is not None else o.gpu_util >= s.idle_util_threshold))
+        gpu_load = o.model_loading or o.gpu_util >= s.idle_util_threshold   # utilisation only (28 Sep)
         cpu_jobs = o.cpu_util is not None and o.cpu_util >= s.cpu_job_util
         r_gpu = max(0.2, (self.cap - s.minimum_mhz) / (s.maximum_mhz - s.minimum_mhz))
         r_cpu = max(0.2, self.cpu_cap)
@@ -897,8 +909,7 @@ class Supervisor:
         else:
             self.projected_s = 0.0
 
-        llm_active = (o.prefill_arrival or o.model_loading
-                      or (o.active_jobs > 0 if o.active_jobs is not None else o.gpu_util >= s.idle_util_threshold))
+        llm_active = o.model_loading or o.gpu_util >= s.idle_util_threshold   # utilisation only (28 Sep)
         reserve = (s.cpu_reservation_ratio
                    if llm_active and o.cpu_c < s.cpu_target_c + s.reservation_yield_c else 0.0)
         clustered = o.cpu_zones is not None
@@ -989,7 +1000,7 @@ class Supervisor:
                        * min(gpu_bal, gpu_guard, zone_cap))
 
         self.low_s = self.low_s + dt if o.gpu_util < s.idle_util_threshold else 0.0
-        prefill_rearm = o.prefill_arrival and s.entry_fallback
+        prefill_rearm = o.prefill_arrival and s.entry_fallback and s.prefill_rearm
         # A single request can complete while other queued/active LLM work
         # still drives the GPU. Its completion event alone is not proof of
         # whole-device idleness and must not collapse a productive cap.
@@ -1043,9 +1054,7 @@ class Supervisor:
                 terms += [(zone[1], loop.setpoint) for zone, loop in zip(o.cpu_zones, self.clusters)]
             if o.cpu_projected_c is not None:
                 terms.append((o.cpu_projected_c, self.cpu_setpoint))
-            gpu_work = (o.prefill_arrival or o.model_loading
-                        or (o.active_jobs is not None and o.active_jobs > 0)
-                        or o.gpu_util >= s.busy_threshold)
+            gpu_work = o.model_loading or o.gpu_util >= s.busy_threshold   # utilisation only (28 Sep)
             self._predictive_fan(o, dt, gpu_work, near_abort, terms)
         elif s.fan_policy == "load":
             loaded = working or o.model_loading or o.cpu_demand_active is True

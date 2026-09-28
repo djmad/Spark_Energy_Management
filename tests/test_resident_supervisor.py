@@ -67,12 +67,12 @@ def ramp_plan():
                          config_digest=config_fingerprint(Config(gpu_max_mhz=1400)))
 
 
-def llm_plan():
+def llm_plan(config=None):
     from energy_control.broker import config_fingerprint
     from energy_control.trial_plan import TrialProposal
     return TrialProposal(3, 1, 30, 0, 1, 1, 1400, 1200, 12, 512, 128, admission_cap=2,
                          reserved_token_cap=1200, cpu_fast_max_mhz=3900, cpu_slow_max_mhz=2808,
-                         config_digest=config_fingerprint(Config(gpu_max_mhz=1400)))
+                         config_digest=config_fingerprint(config or Config(gpu_max_mhz=1400)))
 
 
 class StreamingHandler(BaseHTTPRequestHandler):
@@ -201,7 +201,9 @@ class ResidentSupervisorTests(unittest.TestCase):
         server = ThreadingHTTPServer(("127.0.0.1", 0), StreamingHandler)
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
-        recorder, supervisor = build(self.base, llm_plan(), Config(gpu_max_mhz=1400))
+        # REARM on prefill is off in production (28 Sep); owned trials switch it on.
+        trial_config = Config(gpu_max_mhz=1400, tuning={"prefill_rearm": 1.0})   # bound by the durable plan
+        recorder, supervisor = build(self.base, llm_plan(trial_config), trial_config)
         dispatcher = supervisor.attach_dispatcher(
             partial(HTTPConnection, "127.0.0.1", server.server_port, timeout=2),
             token_measure=lambda request: (100, 50))

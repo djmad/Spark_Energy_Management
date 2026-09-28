@@ -215,7 +215,7 @@ class CoordinatedSupervisorTests(unittest.TestCase):
 
     def test_entry_fallback_can_be_disabled_once_qualified(self):
         for fallback, expected in ((True, "REARM"), (False, "RUN")):
-            controller = Supervisor(Settings(entry_fallback=fallback))
+            controller = Supervisor(Settings(entry_fallback=fallback, prefill_rearm=True))
             controller.cap, controller.busy_s = 1800, 5
             command = controller.step(Observation(60, 50, 1, prefill_arrival=True), 0.25)
             self.assertEqual(command.mode, expected)

@@ -43,7 +43,7 @@ evidence are in doc/48–53.
 | cpufreq measured clock and readback | host sampler, CPU owner | vendor watch, owner evidence |
 | `/proc/stat` per cluster | service | busy/partial gating, learned envelope, vendor watch |
 | fan RPM (cached hwmon, never EC `cur_state`) | service | fan health (guard) |
-| vLLM `/metrics` running/waiting | service (optional) | REARM on a new prefill; control works without vLLM |
+| vLLM `/metrics` running/waiting | service (optional) | recorded; REARM on a new prefill only with `prefill_rearm` = 1 (off since 28 Sep); control works without vLLM |
 
 Estimation (the same formulas as the guard):
 - 2 s least-squares trend and rise per zone.
@@ -89,11 +89,14 @@ Estimation (the same formulas as the guard):
   cuts by cost. The priorities are GPU 1 : CPU 1 (`priority_gpu`,
   `priority_cpu`), weighted by each load's
   relative speed; the balance matters only when a shared limit binds.
-- **Ramp** (PSU protection, unchanged by operator decision):
+- **Ramp** (PSU protection; load detected by GPU utilisation only since
+  28 September 2026):
   - idle cap = entry 1700 MHz; idle is GPU utilisation < 20 % for 1 s
     (`idle_util_threshold`; GB10 reads 8–11 % with nothing running,
     defect 36);
-  - REARM to 1700 MHz on every new prefill;
+  - no REARM on a new prefill (operator, 28 September 2026: "we detect load
+    only on GPU utilisation, prefill we don't need to look at any more");
+    `prefill_rearm` = 1 switches it back on, e.g. for owned trials;
   - release at utilisation ≥ 75 % for 1 s;
   - +100 MHz/s, slowed by the TGPU headroom (10 °C band, minimum 5 %);
   - maximum 2200 MHz (live; hard limit 2500);

@@ -37,6 +37,7 @@ class TuningTests(unittest.TestCase):
         values["cpu_reservation_ratio"] = 0.1       # stays below the entry ratio
         values["fan_boost_headroom"], values["fan_release_headroom"] = 0.5, 0.8
         values["setpoint_recovery_c_s"] = 0.05      # slower than the back-off
+        values["prefill_rearm"] = 1.0               # a switch: exported as 0 or 1
         policy = ShadowPolicy(Config(tuning=normalize_tuning(values)))
         exported = policy.control_state()["tuning"]
         self.assertEqual(set(exported), set(TUNABLES))

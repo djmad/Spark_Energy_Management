@@ -81,7 +81,12 @@ stopping the services that own them. Every other agent stays read-only.
   the dashboard, at the operator's own risk. Never run at unrestricted/vendor
   clocks.
 - A ceiling must be in place **before** any GPU work: at boot, after a driver
-  reset or resume, before model load, and before each new prefill.
+  reset or resume, and before model load. Load is detected by GPU utilisation
+  only (operator, 28 September 2026: "we detect load only on GPU utilisation,
+  prefill we don't need to look at any more, example is our burn-in test"):
+  at idle the cap returns to the entry ceiling, and a new load ramps from
+  there once the GPU is busy. A prompt that joins a running load does not
+  re-arm the entry ceiling (`prefill_rearm` 0; 1 only for owned trials).
 - Ramp up only in small, slow steps. Never catch up missed steps.
 - Never deliberately reproduce the power-supply shutdown.
 

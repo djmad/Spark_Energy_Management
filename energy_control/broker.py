@@ -78,7 +78,11 @@ TUNABLES = {
     "fan_plate_target_c": (35.0, 75.0), "fan_fb_band_c": (4.0, 25.0), "fan_fb_full_c": (0.0, 10.0),
     "fan_neck_w_k": (1.0, 10.0), "fan_air_g0_w_k": (0.5, 5.0), "fan_air_g1_w_k": (0.2, 6.0),
     "fan_room_c": (10.0, 40.0), "fan_background_w": (0.0, 40.0),
-    "fan_anticipate_s": (0.0, 120.0), "fan_power_decay_s": (5.0, 600.0),
+    "fan_anticipate_s": (0.0, 120.0), "fan_power_decay_s": (5.0, 900.0), "fan_release_step_s": (5.0, 300.0),
+    # REARM to the entry ceiling on each new prefill: 0 = off (operator, 28 Sep
+    # 2026: load is detected by GPU utilisation only), 1 = on, e.g. for owned
+    # cold-to-prefill qualification trials through the live override.
+    "prefill_rearm": (0.0, 1.0),
 }
 
 

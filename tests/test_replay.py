@@ -41,7 +41,8 @@ class ReplayTests(unittest.TestCase):
                     recorder.write_sample(record(
                         phase="decode", prefill_arrival=arrival,
                         sample_mono_ns=1_000_000_000 + tick * 500_000_000, **verified))
-            points = replay_run(path, Config(gpu_max_mhz=1800)).points
+            # REARM on prefill is off in production (28 Sep); owned trials switch it on.
+            points = replay_run(path, Config(gpu_max_mhz=1800, tuning={"prefill_rearm": 1.0})).points
             self.assertGreater(points[3].limits.gpu_max_mhz, 1200)
             self.assertEqual(points[4].limits.gpu_max_mhz, 1200)
             self.assertEqual(points[4].limits.mode, "REARM")

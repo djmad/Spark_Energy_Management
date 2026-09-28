@@ -28,7 +28,8 @@ class RandomLoadTests(unittest.TestCase):
         self.assertEqual(row["t_s"], before[0])
 
     def test_live_gpu_edit_rearms_without_resetting_temperature_or_time(self):
-        run = Experiment("random", Settings(random_load=RandomLoad(100, 100, 20, 20, hold_s=60)))
+        run = Experiment("random", Settings(random_load=RandomLoad(100, 100, 20, 20, hold_s=60),
+                                            prefill_rearm=True))
         for _ in range(24):
             run.step()
         before = run.time, run.plant.gpu_c
@@ -61,7 +62,7 @@ class RandomLoadTests(unittest.TestCase):
                 RandomLoad(**changes)
 
     def test_random_experiment_restarts_identically_and_rearms(self):
-        settings = Settings(random_load=RandomLoad(95, 100, 30, 60, hold_s=2))
+        settings = Settings(random_load=RandomLoad(95, 100, 30, 60, hold_s=2), prefill_rearm=True)
         a, b = Experiment("random", settings), Experiment("random", settings)
         for _ in range(80):
             row = a.step()
@@ -94,7 +95,7 @@ class QueueLoadTests(unittest.TestCase):
         self.assertEqual(row["queued_jobs"], 20)
 
     def test_new_queued_work_rearms_during_active_load(self):
-        run = Experiment("queue", Settings(queue_load=QueueLoad(5, 10, 4)))
+        run = Experiment("queue", Settings(queue_load=QueueLoad(5, 10, 4), prefill_rearm=True))
         for _ in range(40):
             run.step()
         self.assertGreater(run.control.cap, 1200)
@@ -116,7 +117,7 @@ class QueueLoadTests(unittest.TestCase):
         self.assertNotEqual(row["mode"], "REARM")
 
     def test_explicit_prefill_with_unchanged_counts_rearms_once(self):
-        run = Experiment("queue", Settings(queue_load=QueueLoad(5, 10, 4)))
+        run = Experiment("queue", Settings(queue_load=QueueLoad(5, 10, 4), prefill_rearm=True))
         for _ in range(40):
             run.step()
         self.assertGreater(run.control.cap, 1200)
@@ -131,7 +132,7 @@ class QueueLoadTests(unittest.TestCase):
             Experiment("idle").inject_prefill_arrival()
 
     def test_headless_queue_prefill_injection_is_bounded_to_queue_scenario(self):
-        summary = headless("queue", Settings(queue_load=QueueLoad(5, 10, 4)),
+        summary = headless("queue", Settings(queue_load=QueueLoad(5, 10, 4), prefill_rearm=True),
                            12, prefill_at_s=10)
         self.assertEqual(summary["injected_prefill_at_s"], 10)
         metrics = summary["injected_prefill_metrics"]
@@ -144,7 +145,7 @@ class QueueLoadTests(unittest.TestCase):
         self.assertEqual(metrics["observed_window_s"], 1.75)
         self.assertGreaterEqual(metrics["max_gpu_rise_c"], 0)
         self.assertLessEqual(summary["maximum_gpu_cap_mhz"], 1800)
-        recovered = headless("queue", Settings(queue_load=QueueLoad(5, 10, 4)),
+        recovered = headless("queue", Settings(queue_load=QueueLoad(5, 10, 4), prefill_rearm=True),
                              30, prefill_at_s=10)["injected_prefill_metrics"]
         # Ramp (100 MHz/s) plus busy dwell, slowed near the 75 C GPU target.
         self.assertIsNotNone(recovered["recovery_to_previous_cap_s"])
@@ -284,7 +285,7 @@ class ControlTests(unittest.TestCase):
     def test_idle_and_new_prefill_rearm(self):
         for observation in [Observation(60, 50, 0), Observation(60, 50, 1, prefill_arrival=True),
                             Observation(60, 50, 0.02, workload_done=True)]:
-            controller = Supervisor()
+            controller = Supervisor(Settings(prefill_rearm=True))
             for _ in range(40):
                 controller.step(Observation(60, 50, 1), 0.25)
             self.assertEqual(controller.cap, 1800)
@@ -312,6 +313,23 @@ class ControlTests(unittest.TestCase):
         self.assertNotEqual(busy.step(Observation(60, 50, 0.085), 0.25).mode, "COOLDOWN")
         with self.assertRaises(ValueError):
             Settings(idle_util_threshold=0.0)          # must stay above zero
+
+    def test_prefill_during_busy_load_keeps_the_cap_by_default(self):
+        # Operator, 28 September 2026: load is detected by GPU utilisation only.
+        # A prompt joining a running decode must not drop the cap to the entry
+        # ceiling; a cold start still begins at the entry ceiling (idle cooldown).
+        controller = Supervisor()
+        for _ in range(40):
+            controller.step(Observation(60, 50, 1), 0.25)
+        self.assertEqual(controller.cap, 1800)
+        command = controller.step(Observation(60, 50, 1, prefill_arrival=True, active_jobs=3), 0.25)
+        self.assertEqual(command.gpu_cap_mhz, 1800)
+        self.assertNotEqual(command.mode, "REARM")
+        for _ in range(4 * 10):
+            controller.step(Observation(60, 50, 0.05), 0.25)       # idle: back to the entry ceiling
+        self.assertEqual(controller.cap, 1200)
+        command = controller.step(Observation(60, 50, 1, prefill_arrival=True), 0.25)
+        self.assertEqual(command.gpu_cap_mhz, 1200)                 # cold start ramps from the entry ceiling
 
     def test_one_completed_request_does_not_cool_down_other_busy_work(self):
         controller = Supervisor()
@@ -446,7 +464,7 @@ class PlantTests(unittest.TestCase):
 
     def test_every_scenario_is_finite_and_bounded(self):
         for scenario in SCENARIOS:
-            experiment = Experiment(scenario)
+            experiment = Experiment(scenario, Settings(prefill_rearm=True))
             for _ in range(720):
                 row = experiment.step()
                 self.assertTrue(all(math.isfinite(v) for v in row.values() if isinstance(v, float)))

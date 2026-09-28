@@ -346,7 +346,8 @@ three inputs:
   adds fan, reaching 12 at 3 °C below it, so the fan acts before the clocks.
 
 Beyond those inputs:
-- The fan goes up at once and comes down one level per 15 s.
+- The fan goes up at once and comes down one level per 15 s (60 s since
+  28 September, `fan_release_step_s`; section 9).
 - The operator's `fan_min_state` ("Fan level floor" in the dashboard) is a
   hard minimum, `fan_load_state` caps the level, and near an abort the fan
   goes to 12.
@@ -412,3 +413,61 @@ The hardware claim of session 3dc0579e is released. At release:
 - the status API is running and the dashboard unit is staged but not enabled;
 - live: mode RUN, GPU cap 1900 MHz, fan floor 11 (predictive), TGPU 46.0 C;
 - no override is active and vLLM is stopped.
+
+## 9. Load detection by GPU utilisation only; gentler fan release (28 September)
+
+Operator, on a steady vLLM load (Gemma, 2480 MHz, util 96 %): "we have a
+constant load on the GPU, still we ramp down while there is no reason"; "the
+fan release to lower speeds is too aggressive".
+
+**Cause of the ramp-downs.** Every new prompt, including one that joined the
+running decode (jobs 1→2, 3→4, …), triggered REARM. The cap dropped to the
+1700 MHz entry ceiling and climbed back in about 8 s, about 20 times in
+25 minutes. It did not even protect: the prefill burst (up to 73 W) already
+ran at full clock in the same second, because vLLM's counters are read at
+1 Hz. Warm bursts from 30 to 73 W occurred many times without a power
+problem. The PSU risk is the cold idle-to-full jump.
+
+**Operator decision:** "we detect load only on GPU utilisation, prefill we
+don't need to look at any more, example is our burn-in test." Since build
+20260928T1140:
+- the ramp, the workload detection and the fan's load-start anticipation
+  use only GPU utilisation (and model loading);
+- a cold start keeps the entry ceiling: at idle (< 20 % for 1 s) the cap
+  cools down to 1700 MHz, and it ramps only at ≥ 75 % for 1 s, as qualified
+  with the burn-in;
+- REARM on prefill remains as a live switch, `prefill_rearm` (0 = off,
+  1 = on, e.g. for owned cold-to-prefill trials); the owned-trial tests
+  switch it on through their durable plan.
+
+**One-off cut to 500 MHz (11:01:16).** A prefill at 2444 MHz / 73 W raised
+the nvidia sensor by 17 K in 2 s. The last-resort band in front of the
+85 °C GPU abort, which projects from 75 °C, cut for one tick and the cap
+ramped back in about 20 s. That is the safety band at 2500 MHz, above the
+qualified 2200 MHz, not a fault.
+
+**Fan.** Between bursts the predictive fan stepped down one level per 15 s
+(12 → 6 within 90 s), and the next burst set it back to 12: a sawtooth with
+22 down and 9 up steps in 40 minutes. New defaults, both live-tunable:
+- `fan_release_step_s` 60 s: one level down per minute, so 12 → 6 takes
+  6 min. It is separate from `fan_down_dwell_s`, which stays 15 s for the
+  older policies.
+- `fan_power_decay_s` 300 s: the peak-held expected power decays slowly, so
+  bursts every 1–5 minutes keep the fan up.
+
+**Live check** (build 20260928T113138, run f0f219fb, under the running vLLM
+load):
+- In 7 minutes with 7 new prompts and 15 power bursts up to 70 W, the cap
+  never dropped by 150 MHz or more, against about 20 drops in the 25 minutes
+  before.
+- Mean cap 2500 MHz, measured 2478 MHz; 2 DERATED ticks of under 150 MHz at
+  TGPU 85 °C.
+- The fan held at 12.
+- At start, defect 35 recurred once ("GPU clock did not settle under the
+  entry ceiling": vLLM was at full clock during the start). The in-process
+  safe state re-armed and the second start succeeded.
+
+End state at the claim release (11:41): energy_control is running
+with the committed configuration and no override:
+mode RUN, GPU cap 2500 MHz (max 2500), fan floor 12 (predictive), prefill_rearm 0.0, fan_release_step_s 60.0.
+The status API is running and vLLM is resident.
