@@ -1,5 +1,58 @@
 # Release notes
 
+## v1.1 — 28 September 2026
+
+### Changed
+
+- **Load detection by GPU utilisation only.** A prompt that joins a running LLM load no
+  longer re-arms the 1700 MHz entry ceiling. Before, every new request dropped the cap for
+  about 8 s, about 20 times in 25 minutes. The prefill burst itself had already run at full
+  clock in the same second, so the re-arm protected nothing.
+  - Cold starts keep the entry ceiling: at idle the cap cools down to it, and it ramps
+    only once the GPU is busy, as qualified with the burn-in.
+  - Re-arm on prefill remains available as the live switch `prefill_rearm` (0 = off,
+    1 = on), e.g. for owned cold-to-prefill qualification trials.
+  - Live check under vLLM: 7 prompts and 15 bursts up to 70 W in 7 minutes gave 0 cap
+    drops; mean cap 2500 MHz, measured 2478 MHz.
+- **Gentler predictive fan release.** The fan now steps down one level per 60 s
+  (`fan_release_step_s`, before 15 s) and holds the expected power for 300 s
+  (`fan_power_decay_s`, before 60 s). This removes the sawtooth between LLM bursts.
+- **Cooler model refit over the full power range** (GPU 5–53 W, fan floors 2–12;
+  holdout 1.95 K, before 2.4 K):
+
+  | Quantity | v1.1 |
+  | --- | --- |
+  | Die + plate | 32 J/K |
+  | Fin block + case | 430 J/K |
+  | Removal to the room | 5.06 W/K at fan 12, 2.98 W/K at fan 2 |
+  | Background heat | 16.9 W |
+
+  The first fit had seen only 5–26 W and ran about 12 K warm at 46 W.
+- **Energy-conserving twin view.** `energy_control/cooler_twin.py` integrates the plate
+  and fin-block stores from the power inputs every second, in the dashboards' samplers.
+  - Input always equals removal plus charge, and in steady state removal equals input.
+  - The TGPU check (predicted against measured) appears as a separate residual. Before,
+    the view derived the fin temperature from the plate estimate, so a steady 63 W load
+    showed as 31 W removed plus 32 W "charging".
+- **Dashboard (twin view):**
+  - heat-flow lines and the neck carry a colour band that rolls downstream, using only
+    the temperature colours between each line's ends;
+  - the fans turn once per second at full speed, proportional to the measured rpm;
+  - the view is static with "reduce motion";
+  - load curves (GPU and CPU utilisation) sit behind the clock graphs;
+  - English labels, with the explanations moved to `dashboard/README.md`.
+
+### Known limits (in addition to v1.0)
+
+- For LLM loads the twin runs about 7–10 K warm on TGPU. The memory-heavy matrix burn-in
+  heats the die more per reported GPU watt than LLM decode, and without a memory power
+  reading this cannot be modelled. The heat balance is not affected.
+- The predictive fan still uses the first fit's cooler constants (`fan_*` tunables);
+  moving it to the refit needs its plate target re-tuned in the twin first.
+- Starting energy_control while the GPU is under full load can fail the first start check
+  once ("GPU clock did not settle under the entry ceiling"). The in-process safe state
+  retries, and the second start succeeds.
+
 ## v1.0 — 28 September 2026
 
 First public release of Spark Energy Management for the Lenovo ThinkStation PGX (NVIDIA
