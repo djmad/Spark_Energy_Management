@@ -75,8 +75,10 @@ older than 5 s counts as stale.
 
 ## The digital twin model
 
-Everything below lives in the `TWIN CONSTANTS` block (object `K`) and
-`CPU_MODEL` in `dashboard/index.html`. After a refit, change the values there.
+The stores and heat flows come from `energy_control/cooler_twin.py`. The server's 1 Hz
+sampler integrates it from the status file's power inputs and serves the state on
+`/api/energy/status` (`twin`). The display constants live in the `TWIN CONSTANTS` block
+(object `K`) and `CPU_MODEL` in `dashboard/index.html`. After a refit, change both.
 
 **Measured, estimated, assumed**
 
@@ -87,23 +89,30 @@ Everything below lives in the `TWIN CONSTANTS` block (object `K`) and
 | Wi-Fi, NVMe | measured | energy_control; reference, not in the control loop |
 | Fan floor and fan speeds | measured | energy_control |
 | CPU power per cluster (~) | estimated | `energy_control/power_estimate.py`, calorimetric v2, scale about ±×2 |
-| Die + contact plate (≈) | estimated | TGPU − 0.52 K/W × P_GPU (the fit's observation equation); cross-check nvidia − P_GPU / 1.9 W/K |
-| Fin block + case air (≈) | model estimate | no sensor: T_plate − P_in / 3.45 W/K, bounded to [room air, plate] |
-| Background heat 12.3 W | fitted | board, RAM, NIC, idle SoC |
+| Die + contact plate (≈) | model | energy-conserving twin state, integrated from the power inputs; checked against TGPU = plate + 0.483 K/W × P_GPU (residual shown as a note above 3 K) |
+| Fin block + case air (≈) | model | energy-conserving twin state (no sensor) |
+| Heat balance | model | input = removal + charge at every step; removal = input in steady state |
+| Background heat 16.9 W | fitted | board, RAM, NIC, idle SoC |
 | Room air 21 °C | measured once | at the intake; no live sensor |
 
 **Fitted cooler constants** (`analysis/sink_fit.py`, two-store fit with the
-room air fixed at 21 °C; training on fan-floor runs at floors 2–12, RMS
-1.02 K; holdout on fan-12 burn-ins, 2.4 K, bias +0.9 K):
+room air fixed at 21 °C, refit 28 September 2026 over the full power range: training
+26–27 September, GPU 5–53 W, fan floors 2–12, RMS 1.34 K; holdout 28 September,
+1.95 K):
 
 | Part | Value |
 | --- | --- |
-| Die + primary contact plate (fast store) | C = 28 J/K ≈ 73 g Cu, τ ≈ 8 s |
-| Neck, plate → fin block | G = 3.45 W/K |
-| Fin block + case air (main store) | C = 272 J/K ≈ 303 g Al, τ ≈ 79 s at fan 12, 123 s at fan 2 |
-| Fin block → room air | G = 1.92 + 1.50 × max(0.2, floor/12) W/K |
-| TGPU hotspot | 0.52 K/W × P_GPU above the die/plate node |
-| Background heat | 12.3 W |
+| Die + primary contact plate (fast store) | C = 32 J/K ≈ 84 g Cu, τ ≈ 10 s |
+| Neck, plate → fin block | G = 3.15 W/K |
+| Fin block + case air (main store) | C = 430 J/K ≈ 480 g Al, τ ≈ 85 s at fan 12, 144 s at fan 2 |
+| Fin block → room air | G = 2.46 + 2.60 × max(0.2, floor/12) W/K (5.06 at fan 12, 2.98 at fan 2) |
+| TGPU hotspot | 0.483 K/W × P_GPU above the die/plate node |
+| Background heat | 16.9 W |
+
+Known limit: the GPU power reading carries a load's heat differently per workload. The
+memory-heavy matrix burn-in heats the die more per reported GPU watt than LLM decode, so
+for LLM loads at the same GPU power the model runs about 7 K warm on TGPU. The heat
+balance is unaffected; the residual is shown as a model-check note.
 
 Earlier cool-down time constants of 130–240 s are a slow case component that
 the fit cannot separate.

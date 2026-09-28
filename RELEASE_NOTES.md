@@ -20,7 +20,7 @@ GB10).
   operator floor.
 - **Calorimetric CPU power estimate** (calorimetric-v2), calibrated against the measured GPU
   power.
-- **Digital twin:** a two-store cooler fit (die/plate 28 J/K, fin block/case 272 J/K, fan
+- **Digital twin:** a two-store cooler fit (die/plate 32 J/K, fin block/case 430 J/K, fan
   dependence, room air measured) and a closed-loop fan twin for tuning.
 - **Standalone read-only dashboard:** the digital twin view and the history graphs.
 
@@ -47,7 +47,8 @@ CC BY-NC 4.0, except the fan drivers in `drivers/`, which are GPL-2.0-only.
 
 - The CPU power estimate has an absolute scale of about ±×2. GB10 exposes no CPU or module
   power reading.
-- The twin's holdout error is 2.4 K, and it cannot separate the plate from the fin block.
+- The twin's holdout error is 1.95 K. It cannot separate the plate from the fin block, and
+  it runs about 7 K warm on TGPU for LLM loads (workload-dependent heat per GPU watt).
 - A cold full-load start after a long idle at the fan floor costs about 4 % GPU clock in the
   first minutes. Raise the fan floor if that matters.
 - Qualified on one machine only.

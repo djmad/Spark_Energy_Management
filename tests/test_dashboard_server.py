@@ -150,11 +150,14 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/cooling?path=/etc/passwd")[0].status, 400)
         resp, data = self.request("GET", "/api/energy/status")
         body = json.loads(data)
-        self.assertEqual(set(body), {"state", "age_s", "status"})
+        self.assertEqual(set(body), {"state", "age_s", "status", "twin"})
         self.assertEqual(body["state"], "fresh"); self.assertEqual(body["status"]["mode"], "RUN")
+        twin = body["twin"]      # energy-conserving cooler twin, fed by the sampler
+        if twin is not None:
+            self.assertAlmostEqual(twin["in_w"], twin["out_w"] + twin["charge_w"], places=1)
         self.status.unlink()
         self.assertEqual(json.loads(self.request("GET", "/api/energy/status")[1]),
-                         {"state": "missing", "age_s": None, "status": None})
+                         {"state": "missing", "age_s": None, "status": None, "twin": None})
         resp, data = self.request("GET", "/healthz")
         self.assertEqual(json.loads(data)["ok"], True)
 

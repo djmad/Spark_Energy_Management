@@ -12,10 +12,15 @@ about 21 C. Model (room fixed at ROOM_C):
   TGPU   = Tp + r * P_gpu                 (hotspot above the plate)
 
 "fins" lumps the fin block with the case air it heats. P_bg is the constant
-background heat (board, memory, NIC, idle SoC). Trained on the night's
-fan-floor runs (floors 2-12), validated on the evening at fan 12.
+background heat (board, memory, NIC, idle SoC).
 
-    python3 -m analysis.sink_fit
+Refit 28 September 2026 over the full power range: training 26-27 September
+(GPU 5-53 W: the night's fan-floor runs at floors 2-12 plus the evening's
+burn-ins), holdout 28 September (incl. an LLM run at 46 W). The first fit
+(night only, 5-26 W) traded background heat against the conductances and ran
+10 K warm at 46 W. Result: energy_control/cooler_twin.py (CoolerParams).
+
+    python3 -m analysis.sink_fit [trace-dir]    # traces from the evidence zip
 """
 from datetime import datetime
 import json
@@ -26,11 +31,13 @@ from types import SimpleNamespace
 
 from energy_control.power_estimate import estimate_cpu_power_w
 
-DIR = Path("/var/lib/spark-energy/traces")
+import sys
+
+DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/var/lib/spark-energy/traces")
 ROOM_C = 21.0
 ORDER = sorted(range(20), key=lambda i: f"policy{i}")
-TRAIN = ("2026-09-27T00:30:00+02:00", "2026-09-27T12:00:00+02:00")
-HOLDOUT = ("2026-09-27T20:10:00+02:00", "2026-09-27T23:15:00+02:00")
+TRAIN = ("2026-09-26T20:00:00+02:00", "2026-09-27T23:59:00+02:00")
+HOLDOUT = ("2026-09-28T00:00:00+02:00", "2026-09-28T23:59:00+02:00")
 NAMES = ("Cp", "Cf", "Gn", "g0", "g1", "P_bg", "r")
 NAMES3 = ("Cd", "Cp", "Cf", "Gd", "Gn", "g0", "g1", "P_bg", "r")
 
@@ -41,7 +48,7 @@ def ts(s):
 
 def load(a, b):
     rows = []
-    for name in ("20260926.jsonl", "20260927.jsonl"):
+    for name in ("20260926.jsonl", "20260927.jsonl", "20260928.jsonl"):
         path = DIR / name
         if not path.exists():
             continue

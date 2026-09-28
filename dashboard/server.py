@@ -63,6 +63,10 @@ try:
     from energy_control.limits import ACPI_ABORT_C, CPU_TARGET_QUALIFIED_MAX_C
 except Exception:  # standalone copy without the controller package
     ACPI_ABORT_C, CPU_TARGET_QUALIFIED_MAX_C = 96.0, 92.0
+try:  # energy-conserving cooler twin, integrated by the sampler (pure, no device I/O)
+    from energy_control.cooler_twin import CoolerTwin, twin_from_status
+except Exception:  # standalone copy without the controller package: the page falls back
+    CoolerTwin = twin_from_status = None
 finally:
     sys.path.pop(0)
 GPU_ABORT_C, GPU_TARGET_C = 85.0, 75.0
@@ -219,6 +223,8 @@ class History:
         self._last_utc_ns: Optional[int] = None
         self._last_t_ms = 0
         self._appended = 0
+        self._twin = CoolerTwin() if CoolerTwin is not None else None
+        self._twin_state: Optional[Dict[str, Any]] = None
 
     def poll_once(self, now_ms: Optional[int] = None) -> bool:
         """Read the status file once; append a row for each new publication. True if appended."""
@@ -233,8 +239,10 @@ class History:
             return False
         self._last_utc_ns, self._last_t_ms = utc_ns, t_ms
         row = cooling_row(payload, t_ms)
+        twin_state = twin_from_status(self._twin, payload) if self._twin is not None else None
         now_ms = int(time.time() * 1000) if now_ms is None else now_ms
         with self._lock:
+            self._twin_state = twin_state
             self._rows.append(row)
             self._appended += 1
             if self._appended % 10 == 0 or self._rows[0]["t"] < now_ms - WINDOW_MS:
@@ -248,6 +256,11 @@ class History:
             except Exception as exc:  # never let the sampler die on odd input
                 print(f"sampler: {type(exc).__name__}: {exc}", file=sys.stderr)
             stop.wait(POLL_SECONDS)
+
+    def twin(self) -> Optional[Dict[str, Any]]:
+        """Latest energy-conserving cooler twin state (None until the first sample)."""
+        with self._lock:
+            return dict(self._twin_state) if self._twin_state else None
 
     def snapshot(self, since_ms: Optional[int] = None) -> Dict[str, Any]:
         """Same shape as the Spark dashboard's /api/cooling response."""
@@ -353,7 +366,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, self.history.snapshot(since_ms))
         elif url.path == "/api/energy/status":
             payload, state, age_s = read_status(self.status_file)
-            self._json(200, {"state": state, "age_s": age_s, "status": payload if isinstance(payload, dict) else None})
+            self._json(200, {"state": state, "age_s": age_s, "status": payload if isinstance(payload, dict) else None,
+                             "twin": self.history.twin() if state == "fresh" else None})
         elif url.path == "/healthz":
             self._json(200, {"ok": True, "name": "spark-energy-dashboard"})
         else:

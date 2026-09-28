@@ -283,6 +283,48 @@ separate the plate from the fin block.
 
 The dashboard twin view uses these values (TWIN CONSTANTS in `index.html`).
 
+**Refit over the full power range (28 September 2026).** The operator saw the
+twin view claim that a steady LLM load (46 W GPU at 2480 MHz, for 15 min)
+removed only 30.9 W while "charging" +32 W. Two faults combined:
+
+- **The fit.** It had seen only 5–26 W. At those powers, "more background
+  heat with lower resistance" and "less background heat with higher
+  resistance" give the same temperatures, and it picked the second. At
+  46 W it ran 11.7 K warm (steady-state residuals: +1 K at 5 W, 0 K at
+  17–26 W, −4.2 K at 40 W, −11.7 K at 46 W).
+- **The view.** It derived the fin temperature from the plate estimate
+  (T_f = T_p − P_in / Gn), so every kelvin of plate error became 3–5 W of
+  false charging.
+
+The refit trains on 26–27 September (GPU 5–53 W, floors 2–12, burn-ins
+included) and holds out 28 September (including the LLM run). Holdout RMS is
+1.95 K, against 2.4 K before.
+
+| Quantity | Refit (5–53 W) | Night-only fit |
+| --- | --- | --- |
+| Die + contact plate | 32 J/K, τ ≈ 10 s | 28 J/K |
+| Neck plate → fins | 3.15 W/K | 3.45 W/K |
+| Fin block + case air | 430 J/K ≈ 480 g Al, τ 85 s at fan 12 / 144 s at fan 2 | 272 J/K |
+| Fins → room | 2.46 + 2.60 × share W/K (5.06 at 12, 2.98 at 2) | 1.92 + 1.50 × share |
+| Background heat | 16.9 W | 12.3 W |
+| TGPU above the plate | 0.483 K/W × P_GPU | 0.52 K/W |
+
+- **The remaining error depends on the workload.** At the same GPU power the
+  memory-heavy matrix burn-in heats the die more than LLM decode. The E zones
+  read 52.3 °C at a 39 W burn-in against 47.7 °C at 46 W LLM. So the twin
+  still runs about 7 K warm on TGPU for LLM loads. Without a memory power
+  reading this cannot be modelled.
+- **The view is now energy-conserving.** `energy_control/cooler_twin.py`
+  integrates both stores from the power inputs every second, in the
+  dashboards' samplers. Input equals removal plus charge at every step,
+  and removal equals input in steady state. The TGPU check (predicted
+  against measured) shows as a note, not in the balance.
+- **At the same moment, old view against new:** removal 38.6 W against
+  56.9 W, charge +30.0 W against +11.3 W, with the load still settling.
+- The predictive fan in energy_control still uses the first fit's constants
+  (`fan_*` tunables). Moving it to the refit needs its plate target re-tuned
+  in the twin first.
+
 **Why the fan never ramped down.** The load fan policy held the floor at 12
 while anything counted as load. The CPU demand signal (≥ 10 % on, < 5 % off)
 fires on the machine's background services, 3–27 % CPU with a median of
@@ -361,3 +403,12 @@ by 600 s idle. No abort, 0 errors, 59.0 TFLOPS.
   colder start and less loss, at the cost of more swing. The policy is live
   through the boot-bound override (`fan_policy` "predictive") until the
   operator commits it.
+
+## 8. End state (28 September 2026, 03:05)
+
+The hardware claim of session 3dc0579e is released. At release:
+- energy_control is running (build 20260928T013712), with committed configuration
+  entry 1700 / max 2500 MHz, CPU 92 °C / GPU 78 °C, fan policy predictive and floor 6;
+- the status API is running and the dashboard unit is staged but not enabled;
+- live: mode RUN, GPU cap 1900 MHz, fan floor 11 (predictive), TGPU 46.0 C;
+- no override is active and vLLM is stopped.
