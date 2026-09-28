@@ -1,0 +1,47 @@
+# Installed (not enabled) by scripts/install-energy-control.sh; enable it yourself.
+# Standalone read-only Spark Energy dashboard (dashboard/server.py, loopback).
+# Reads only /run/spark-energy/status.json published by energy_control.service:
+# no hardware access, no mutation, no request-supplied paths, history in memory.
+# Install reviewed code under /opt/spark-energy first; publish it remotely only
+# through an authenticated reverse proxy, never by binding a public address.
+[Unit]
+Description=Spark Energy read-only dashboard (loopback)
+Documentation=file:/opt/spark-energy/dashboard/README.md
+After=energy_control.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=exec
+DynamicUser=yes
+WorkingDirectory=/opt/spark-energy
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B -m dashboard.server --host 127.0.0.1 --port 8790 --status-file /run/spark-energy/status.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/run/spark-energy
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=128M
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

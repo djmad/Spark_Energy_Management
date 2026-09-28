@@ -1,0 +1,33 @@
+[Unit]
+Description=ThinkStation PGX / DGX Spark additive fan-floor controller
+After=systemd-modules-load.service
+Wants=systemd-modules-load.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/dgx-fan-control daemon
+Restart=on-failure
+RestartPreventExitStatus=69
+RestartSec=30s
+TimeoutStopSec=30s
+CapabilityBoundingSet=
+LockPersonality=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectKernelLogs=yes
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

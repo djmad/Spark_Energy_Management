@@ -1,0 +1,37 @@
+# Read-only energy_control status API (loopback). Serves only
+# /run/spark-energy/status.json published by energy_control.service: no
+# hardware access, no mutation, no request-supplied paths (doc/46).
+[Unit]
+Description=Spark Energy read-only status API (loopback)
+Documentation=file:/opt/spark-energy/doc/46-final-qualification.md
+After=energy_control.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=exec
+DynamicUser=yes
+WorkingDirectory=/opt/spark-energy
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B -m energy_control.status_api --port 18765
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=128M
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

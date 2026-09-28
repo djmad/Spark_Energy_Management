@@ -1,0 +1,267 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1300" viewBox="0 0 1840 1300" font-family="DejaVu Sans, Helvetica, Arial, sans-serif">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#444"/></marker><marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c83a3a"/></marker><marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9a5a12"/></marker><marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b6b78"/></marker></defs>
+<rect x="0" y="0" width="1840" height="1300" fill="#ffffff"/>
+<text x="20" y="36" font-size="24" font-weight="700" fill="#111">energy_control – Regelkreis (Thermal v3, Stand 27.09.2026, Build 184917)</text>
+<text x="20" y="60" font-size="13" fill="#444">Ein einziger Dienst spricht mit der Hardware (energy_control): Sensoren → Abtastung/Schätzung → Regler (Supervisor, 4 Hz) → Owner-Prozesse → Stellglieder. Unabhängiger Guard mit eigenem Sampler. Harte Grenzen: ACPI 96 °C · GPU 85 °C · GPU ≤ 2500 MHz (qualifiziert 2200).</text>
+<text x="20" y="128" font-size="13" font-weight="700" fill="#555" letter-spacing="1">HARDWARE-SENSOREN</text>
+<text x="330" y="128" font-size="13" font-weight="700" fill="#555" letter-spacing="1">ABTASTUNG &amp; SCHÄTZUNG</text>
+<text x="640" y="128" font-size="13" font-weight="700" fill="#555" letter-spacing="1">REGLER (policy / Supervisor, 4 Hz)</text>
+<text x="1300" y="128" font-size="13" font-weight="700" fill="#555" letter-spacing="1">OWNER-PROZESSE</text>
+<text x="1590" y="128" font-size="13" font-weight="700" fill="#555" letter-spacing="1">STELLGLIEDER</text>
+<polyline points="1830,96 250,96 250,142" fill="none" stroke="#9a5a12" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#arrO)"/>
+<text x="930" y="89" font-size="11" fill="#9a5a12" text-anchor="middle" font-style="italic">Strecke / Wärmepfad: Kerne &amp; GPU-Die → Hotspot → Kupfer-Kühler (165 J/K, 0,8 + 3,3·Lüfter W/K) → ACPI-Zonen &amp; Sensoren</text>
+<rect x="20" y="145" width="270" height="250" rx="8" fill="#e8f1ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<text x="30" y="165" font-size="14" font-weight="700" fill="#3b6fd8">ACPI-Thermalzonen</text>
+<text x="30" y="185" font-size="12" fill="#222">TS0P, TS1P  – P-Cluster (Kupfer + Kern)</text>
+<text x="30" y="201.5" font-size="12" fill="#222">TS0E, TS1E  – E-Cluster</text>
+<text x="30" y="218.0" font-size="12" fill="#222">TSOC  = max(TS0P, TS1P) (Firmware)</text>
+<text x="30" y="234.5" font-size="12" fill="#222">TUNC  – Uncore</text>
+<text x="30" y="251.0" font-size="12" font-weight="700" fill="#222">TGPU  – GPU-Die-Hotspot</text>
+<text x="30" y="267.5" font-size="12" fill="#222">  (unter Matrixlast +0,29 °C/W</text>
+<text x="30" y="284.0" font-size="12" fill="#222">   über dem nvidia-Sensor)</text>
+<text x="30" y="300.5" font-size="12" fill="#222">Auflösung 0,1 °C, Ripple ~0,45 °C</text>
+<text x="30" y="317.0" font-size="12" fill="#222">Abbruchgrenze: 96 °C (alle)</text>
+<rect x="20" y="410" width="270" height="110" rx="8" fill="#e8f1ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<text x="30" y="430" font-size="14" font-weight="700" fill="#3b6fd8">NVIDIA GPU (nvidia-smi)</text>
+<text x="30" y="450" font-size="12" fill="#222">Temperatur (ganzzahlig °C)</text>
+<text x="30" y="466.5" font-size="12" fill="#222">Takt gemessen / max. 3003 MHz</text>
+<text x="30" y="483.0" font-size="12" fill="#222">Leistung W · Auslastung %</text>
+<text x="30" y="499.5" font-size="12" fill="#222">Abbruchgrenze: 85 °C</text>
+<rect x="20" y="535" width="270" height="70" rx="8" fill="#e8f1ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<text x="30" y="555" font-size="14" font-weight="700" fill="#3b6fd8">cpufreq (20 Policies)</text>
+<text x="30" y="575" font-size="12" fill="#222">Ist-Takt je Kern, scaling_max (Readback)</text>
+<rect x="20" y="620" width="270" height="70" rx="8" fill="#e8f1ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<text x="30" y="640" font-size="14" font-weight="700" fill="#3b6fd8">/proc/stat</text>
+<text x="30" y="660" font-size="12" fill="#222">Auslastung je Cluster E0/P0/E1/P1</text>
+<rect x="20" y="705" width="270" height="70" rx="8" fill="#e8f1ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<text x="30" y="725" font-size="14" font-weight="700" fill="#3b6fd8">Lüfter dgx_ec_fan (hwmon)</text>
+<text x="30" y="745" font-size="12" fill="#222">Drehzahl (gecacht, kein EC cur_state)</text>
+<rect x="20" y="790" width="270" height="80" rx="8" fill="#e8f1ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<text x="30" y="810" font-size="14" font-weight="700" fill="#3b6fd8">vLLM /metrics</text>
+<text x="30" y="830" font-size="12" fill="#222">laufende / wartende Anfragen</text>
+<text x="30" y="846.5" font-size="12" fill="#222">(optional – Regelung auch ohne vLLM)</text>
+<rect x="20" y="885" width="270" height="60" rx="8" fill="#e8f1ff" stroke="#3b6fd8" stroke-width="1.6"/>
+<text x="30" y="905" font-size="14" font-weight="700" fill="#3b6fd8">/proc/meminfo</text>
+<text x="30" y="925" font-size="12" fill="#222">verfügbarer Speicher</text>
+<rect x="330" y="145" width="270" height="460" rx="8" fill="#eef7f7" stroke="#2b8a8a" stroke-width="1.6"/>
+<text x="340" y="165" font-size="14" font-weight="700" fill="#2b8a8a">Host-Sampler (Policy-Seite)</text>
+<text x="340" y="185" font-size="12" fill="#222">eigener Prozess, 4 Hz, nice −10</text>
+<text x="340" y="201.5" font-size="12" fill="#222"></text>
+<text x="340" y="218.0" font-size="12" font-weight="700" fill="#222">Trend &amp; Anstieg</text>
+<text x="340" y="234.5" font-size="12" fill="#222">2 s Least-Squares je Zone</text>
+<text x="340" y="251.0" font-size="12" fill="#222"></text>
+<text x="340" y="267.5" font-size="12" font-weight="700" fill="#222">Guard-Prognose (wie der Guard)</text>
+<text x="340" y="284.0" font-size="12" fill="#222">P = Trend + 2 s × Anstieg</text>
+<text x="340" y="300.5" font-size="12" fill="#222">(ab Trend ≥ 83 °C, sonst P = Trend)</text>
+<text x="340" y="317.0" font-size="12" fill="#222"></text>
+<text x="340" y="333.5" font-size="12" font-weight="700" fill="#222">Cluster-Zonen (Trend, P)</text>
+<text x="340" y="350.0" font-size="12" fill="#222">E0←TS0E  P0←TS0P  E1←TS1E  P1←TS1P</text>
+<text x="340" y="366.5" font-size="12" fill="#222"></text>
+<text x="340" y="383.0" font-size="12" font-weight="700" fill="#222">GPU-Zone (Trend, P) ← TGPU</text>
+<text x="340" y="399.5" font-size="12" fill="#222"></text>
+<text x="340" y="416.0" font-size="12" font-weight="700" fill="#222">CPU-Proxy = heißeste CPU-Zone</text>
+<text x="340" y="432.5" font-size="12" fill="#222">(ohne TGPU; Defekt 34)</text>
+<text x="340" y="449.0" font-size="12" fill="#222"></text>
+<text x="340" y="465.5" font-size="12" font-weight="700" fill="#222">Cluster-Last ← /proc/stat</text>
+<text x="340" y="482.0" font-size="12" fill="#222"></text>
+<text x="340" y="498.5" font-size="12" font-weight="700" fill="#222">Ripple-Statistik (Status)</text>
+<text x="340" y="515.0" font-size="12" fill="#222"></text>
+<text x="340" y="531.5" font-size="12" fill="#222">→ Regler: Cluster-Zonen + Last (CPU),</text>
+<text x="340" y="548.0" font-size="12" fill="#222">   nvidia °C + Last, TGPU (GPU), Lüfter</text>
+<rect x="330" y="620" width="270" height="95" rx="8" fill="#eef7f7" stroke="#2b8a8a" stroke-width="1.6"/>
+<text x="340" y="640" font-size="14" font-weight="700" fill="#2b8a8a">Vendor-Watch</text>
+<text x="340" y="660" font-size="12" fill="#222">Soll-Cap vs. Ist-Takt je Cluster + GPU</text>
+<text x="340" y="676.5" font-size="12" fill="#222">Last ≥ 80 %, Defizit &gt; 100 MHz, 5 s,</text>
+<text x="340" y="693.0" font-size="12" fill="#222">nur bei konstantem Cap (≥ 3 s)</text>
+<text x="340" y="709.5" font-size="12" fill="#222">→ Meldung „vendor limit“ (nur Anzeige)</text>
+<rect x="330" y="790" width="270" height="80" rx="8" fill="#eef7f7" stroke="#2b8a8a" stroke-width="1.6"/>
+<text x="340" y="810" font-size="14" font-weight="700" fill="#2b8a8a">QueueSignals (vLLM)</text>
+<text x="340" y="830" font-size="12" fill="#222">neue Prefill-Ankunft → REARM</text>
+<text x="340" y="846.5" font-size="12" fill="#222">Queue leer → Job fertig</text>
+<polyline points="290,270 328,270" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="290,465 328,465" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="290,570 328,570" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="290,655 310,655 310,560 328,560" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="290,740 318,740 318,585 328,585" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="290,830 328,830" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<rect x="640" y="145" width="620" height="395" rx="8" fill="#fafcfa" stroke="#8fbf95" stroke-width="1.6"/>
+<text x="650" y="165" font-size="14" font-weight="700" fill="#8fbf95">CPU – vier Cluster-Regler (ClusterLoop je E0 · P0 · E1 · P1)</text>
+<rect x="655" y="180" width="290" height="215" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="665" y="200" font-size="14" font-weight="700" fill="#2f8f3a">Zonen-PID je Cluster</text>
+<text x="665" y="220" font-size="11" fill="#222">Eingang: Zonen-Trend (TS0E…TS1P)</text>
+<text x="665" y="235.5" font-size="11" fill="#222">PID mit bedingtem Integrator</text>
+<text x="665" y="251.0" font-size="11" fill="#222">(Start 1, integriert nur ungesättigt,</text>
+<text x="665" y="266.5" font-size="11" fill="#222"> Abbau ×3 über dem Sollwert)</text>
+<text x="665" y="282.0" font-size="11" fill="#222">Totband: Trend &lt; Sollwert − 12 °C → voll</text>
+<text x="665" y="297.5" font-size="11" fill="#222">Teil-Last (&lt; 50 %): Entlastung erst,</text>
+<text x="665" y="313.0" font-size="11" fill="#222"> wenn Prognose ≥ Sollwert − 2 °C</text>
+<text x="665" y="328.5" font-size="11" fill="#222">Erholung: 0,03/s × Verjüngung</text>
+<text x="665" y="344.0" font-size="11" fill="#222"> (Prognose-Abstand / 15 °C, min 5 %)</text>
+<rect x="960" y="180" width="285" height="150" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="970" y="200" font-size="14" font-weight="700" fill="#2f8f3a">Guard-bewusster Sollwert</text>
+<text x="970" y="220" font-size="11" fill="#222">Decke = min(Ziel 90, 96 − 3 − 4) = 89 °C</text>
+<text x="970" y="235.5" font-size="11" fill="#222">Rücknahme 1 °C/s, wenn Prognose</text>
+<text x="970" y="251.0" font-size="11" fill="#222"> ≥ 96 − 2 °C (Beinahe-Treffer)</text>
+<text x="970" y="266.5" font-size="11" fill="#222">Erholung 0,02 °C/s, max. −6 °C</text>
+<text x="970" y="282.0" font-size="11" fill="#222">live: Ziel, Gains, Tunables (bumpless)</text>
+<polyline points="960,255 947,255" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<rect x="960" y="340" width="285" height="75" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="970" y="360" font-size="14" font-weight="700" fill="#2f8f3a">Taktrahmen (Operator-Konzept)</text>
+<text x="970" y="380" font-size="11" fill="#222">Teil-Last-P-Cluster: gelernte Basis − 4 %</text>
+<text x="970" y="395.5" font-size="11" fill="#222">Last ≥ 90 % → kontrollierter Hochlauf</text>
+<rect x="655" y="405" width="290" height="125" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="665" y="425" font-size="14" font-weight="700" fill="#2f8f3a">Grenzen je Cluster (Minimum)</text>
+<text x="665" y="445" font-size="11" fill="#222">CPU-Grenze: Einstiegs-Clamp (PSU),</text>
+<text x="665" y="460.5" font-size="11" fill="#222"> Modell-Laden, Leerlauf-Abbau</text>
+<text x="665" y="476.0" font-size="11" fill="#222">Bilanz-Schnitt (für die GPU)</text>
+<text x="665" y="491.5" font-size="11" fill="#222">Schutzband: Prognose 95–96 °C</text>
+<text x="665" y="507.0" font-size="11" fill="#222">Operator-Maxima E0/P0/E1/P1 (live)</text>
+<rect x="960" y="425" width="285" height="105" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="970" y="445" font-size="14" font-weight="700" fill="#2f8f3a">Fast-first &amp; Ausgabe</text>
+<text x="970" y="465" font-size="11" fill="#222">E ≤ P/0,75 (Anteil am Operator-Max.)</text>
+<text x="970" y="480.5" font-size="11" fill="#222">Cluster-Caps E0/P0/E1/P1 (MHz)</text>
+<text x="970" y="496.0" font-size="11" fill="#222">Befehlsformung: 25-MHz-Stufen,</text>
+<text x="970" y="511.5" font-size="11" fill="#222"> Anheben ab +50 MHz, Senken sofort</text>
+<polyline points="800,405 800,397" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="960,385 947,385" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="945,470 958,470" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<rect x="640" y="555" width="620" height="400" rx="8" fill="#fafcfa" stroke="#8fbf95" stroke-width="1.6"/>
+<text x="650" y="575" font-size="14" font-weight="700" fill="#8fbf95">GPU – Temperaturregler, Zonenregler, Rampe</text>
+<rect x="655" y="590" width="290" height="95" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="665" y="610" font-size="14" font-weight="700" fill="#2f8f3a">GPU-PID (nvidia-Sensor)</text>
+<text x="665" y="630" font-size="11" fill="#222">Ziel 75 °C, bedingter Integrator</text>
+<text x="665" y="645.5" font-size="11" fill="#222">kd 0,04, Ableitungsfilter 3 s</text>
+<text x="665" y="661.0" font-size="11" fill="#222">Schutzband 84–85 °C</text>
+<rect x="655" y="695" width="290" height="110" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="665" y="715" font-size="14" font-weight="700" fill="#2f8f3a">TGPU-Zonenregler (Defekt 34)</text>
+<text x="665" y="735" font-size="11" fill="#222">ClusterLoop auf TGPU-Trend</text>
+<text x="665" y="750.5" font-size="11" fill="#222">Sollwert = Decke − 3 °C (86 °C)</text>
+<text x="665" y="766.0" font-size="11" fill="#222">Schutzband: Prognose 95–96 °C</text>
+<text x="665" y="781.5" font-size="11" fill="#222"> (Spitze allein: höchstens bis Einstieg)</text>
+<text x="665" y="797.0" font-size="11" fill="#222">kp 0,02 · ki 0,004 · Spike-Schritt 2 %</text>
+<rect x="655" y="815" width="290" height="125" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="665" y="835" font-size="14" font-weight="700" fill="#2f8f3a">Leistungsbilanz (Zwilling)</text>
+<text x="665" y="855" font-size="11" fill="#222">verteilt nötige Entlastung auf</text>
+<text x="665" y="870.5" font-size="11" fill="#222"> GPU- oder CPU-Schnitt nach Kosten</text>
+<text x="665" y="886.0" font-size="11" fill="#222">Prioritäten GPU 1 : CPU 1 (live),</text>
+<text x="665" y="901.5" font-size="11" fill="#222"> Gewicht = Priorität / rel. Tempo</text>
+<text x="665" y="917.0" font-size="11" fill="#222">wirkt nur bei gemeinsamer Grenze</text>
+<rect x="960" y="590" width="285" height="240" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="970" y="610" font-size="14" font-weight="700" fill="#2f8f3a">Rampen-Logik (PSU-Schutz)</text>
+<text x="970" y="630" font-size="11" fill="#222">Leerlauf: Cap = Einstieg 1700 MHz</text>
+<text x="970" y="645.5" font-size="11" fill="#222">REARM: neue Prefill-Ankunft → 1700</text>
+<text x="970" y="661.0" font-size="11" fill="#222">Freigabe: Auslastung ≥ 75 % für 1 s</text>
+<text x="970" y="676.5" font-size="11" fill="#222">Rampe: +100 MHz/s × TGPU-Bremse</text>
+<text x="970" y="692.0" font-size="11" fill="#222"> (Abstand zum Sollwert / 10 °C,</text>
+<text x="970" y="707.5" font-size="11" fill="#222">  min 5 %)</text>
+<text x="970" y="723.0" font-size="11" fill="#222">Obergrenze: Maximum 2200 (Broker/</text>
+<text x="970" y="738.5" font-size="11" fill="#222"> Override live, hart 2500)</text>
+<text x="970" y="754.0" font-size="11" fill="#222">Senken: sofort; Abkühlen 150 MHz/s</text>
+<rect x="960" y="840" width="285" height="100" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="970" y="860" font-size="14" font-weight="700" fill="#2f8f3a">GPU-Cap</text>
+<text x="970" y="880" font-size="11" fill="#222">= min(Rampe, thermischer Cap)</text>
+<text x="970" y="895.5" font-size="11" fill="#222">thermisch = min(PID/Bilanz,</text>
+<text x="970" y="911.0" font-size="11" fill="#222"> Schutzband, TGPU-Zonenregler)</text>
+<text x="970" y="926.5" font-size="11" fill="#222">→ 25-MHz-Stufen</text>
+<polyline points="945,640 952,640" fill="none" stroke="#444" stroke-width="1.6"/>
+<polyline points="945,750 952,750" fill="none" stroke="#444" stroke-width="1.6"/>
+<polyline points="945,875 952,875" fill="none" stroke="#444" stroke-width="1.6"/>
+<polyline points="952,640 952,885 958,885" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="1100,830 1100,838" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<rect x="640" y="970" width="620" height="60" rx="8" fill="#eaf7ea" stroke="#2f8f3a" stroke-width="1.6"/>
+<text x="650" y="990" font-size="12" font-weight="700" fill="#2f8f3a">Lüfter: Last → Floor 12 · 300 s Leerlauf → Minimum · Kurve ab 70 °C · nahe Abbruch → 12</text>
+<polyline points="600,300 653,300" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="600,430 620,430 620,750 653,750" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="600,480 610,480 610,640 653,640" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="600,845 632,845 632,961 1253,961 1253,700 1247,700" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<text x="1100" y="957" font-size="11" fill="#444" text-anchor="start" font-style="italic">REARM</text>
+<polyline points="600,520 626,520 626,1000 638,1000" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<rect x="1300" y="300" width="240" height="150" rx="8" fill="#fff3e6" stroke="#d17a1b" stroke-width="1.6"/>
+<text x="1310" y="320" font-size="14" font-weight="700" fill="#d17a1b">CPU-Owner (Prozess)</text>
+<text x="1310" y="340" font-size="11" fill="#222">schreibt scaling_max_freq</text>
+<text x="1310" y="355.5" font-size="11" fill="#222"> je Cluster (20 Policies)</text>
+<text x="1310" y="371.0" font-size="11" fill="#222">Readback + Nachweis 10 Hz</text>
+<text x="1310" y="386.5" font-size="11" fill="#222">an Policy und Guard</text>
+<text x="1310" y="402.0" font-size="11" fill="#222">Not-Aktion: CPU-Minimum</text>
+<rect x="1300" y="660" width="240" height="170" rx="8" fill="#fff3e6" stroke="#d17a1b" stroke-width="1.6"/>
+<text x="1310" y="680" font-size="14" font-weight="700" fill="#d17a1b">GPU-Owner (Prozess)</text>
+<text x="1310" y="700" font-size="11" fill="#222">nvidia-smi -lgc 200,Cap</text>
+<text x="1310" y="715.5" font-size="11" fill="#222">Besitzprüfung (Legacy maskiert,</text>
+<text x="1310" y="731.0" font-size="11" fill="#222"> Treiber-Epoche; Zeitstempel</text>
+<text x="1310" y="746.5" font-size="11" fill="#222"> nach Prüfung – Defekt 33)</text>
+<text x="1310" y="762.0" font-size="11" fill="#222">Nachweis 10 Hz an Policy/Guard</text>
+<text x="1310" y="777.5" font-size="11" fill="#222">Not-Aktion: 200–500 MHz</text>
+<rect x="1300" y="965" width="240" height="70" rx="8" fill="#fff3e6" stroke="#d17a1b" stroke-width="1.6"/>
+<text x="1310" y="985" font-size="14" font-weight="700" fill="#d17a1b">Lüfter-Owner</text>
+<text x="1310" y="1005" font-size="11" fill="#222">dgx_ec_fan Floor (additiv)</text>
+<text x="1310" y="1020.5" font-size="11" fill="#222">Not-Aktion: Floor 12</text>
+<polyline points="1245,475 1275,475 1275,380 1298,380" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<text x="1250" y="468" font-size="11" fill="#444" text-anchor="start" font-style="italic">Cluster-Caps</text>
+<polyline points="1245,900 1275,900 1275,745 1298,745" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<text x="1250" y="893" font-size="11" fill="#444" text-anchor="start" font-style="italic">GPU-Cap</text>
+<polyline points="1260,1000 1298,1000" fill="none" stroke="#444" stroke-width="1.6" marker-end="url(#arr)"/>
+<text x="1262" y="994" font-size="11" fill="#444" text-anchor="start" font-style="italic">Floor</text>
+<rect x="1590" y="300" width="230" height="150" rx="8" fill="#fbeee0" stroke="#9a5a12" stroke-width="1.6"/>
+<text x="1600" y="320" font-size="14" font-weight="700" fill="#9a5a12">20 CPU-Kerne</text>
+<text x="1600" y="340" font-size="11" fill="#222">cppc_cpufreq, Governor</text>
+<text x="1600" y="355.5" font-size="11" fill="#222"> conservative</text>
+<text x="1600" y="371.0" font-size="11" fill="#222">E: 338–2808 MHz</text>
+<text x="1600" y="386.5" font-size="11" fill="#222">P: 1378–3900 MHz</text>
+<rect x="1590" y="660" width="230" height="170" rx="8" fill="#fbeee0" stroke="#9a5a12" stroke-width="1.6"/>
+<text x="1600" y="680" font-size="14" font-weight="700" fill="#9a5a12">GB10-GPU</text>
+<text x="1600" y="700" font-size="11" fill="#222">Takt-Lock (Min/Max)</text>
+<text x="1600" y="715.5" font-size="11" fill="#222">Matrixlast: P ≈ 4,5 + 11,1·f²·²⁷ W</text>
+<text x="1600" y="731.0" font-size="11" fill="#222"> (≈ 71 W bei 2200 MHz)</text>
+<text x="1600" y="746.5" font-size="11" fill="#222">LLM-Decode: 20–50 W</text>
+<rect x="1590" y="965" width="230" height="70" rx="8" fill="#fbeee0" stroke="#9a5a12" stroke-width="1.6"/>
+<text x="1600" y="985" font-size="14" font-weight="700" fill="#9a5a12">Lüfter (EC)</text>
+<text x="1600" y="1005" font-size="11" fill="#222">Firmware-Schutz bleibt aktiv</text>
+<polyline points="1540,375 1588,375" fill="none" stroke="#9a5a12" stroke-width="1.6" marker-end="url(#arrO)"/>
+<polyline points="1540,745 1588,745" fill="none" stroke="#9a5a12" stroke-width="1.6" marker-end="url(#arrO)"/>
+<polyline points="1540,1000 1588,1000" fill="none" stroke="#9a5a12" stroke-width="1.6" marker-end="url(#arrO)"/>
+<polyline points="1790,300 1790,96" fill="none" stroke="#9a5a12" stroke-width="2.2" stroke-dasharray="7 5"/>
+<polyline points="1820,745 1830,745 1830,96" fill="none" stroke="#9a5a12" stroke-width="2.2" stroke-dasharray="7 5"/>
+<rect x="330" y="1055" width="1210" height="105" rx="8" fill="#fdecec" stroke="#c83a3a" stroke-width="1.6"/>
+<text x="340" y="1075" font-size="14" font-weight="700" fill="#c83a3a">Unabhängiger Guard (eigener Prozess, eigener Sampler 10 Hz) – harte Grenzen, nicht konfigurierbar</text>
+<text x="340" y="1095" font-size="12" fill="#222">Abbruch bei: ACPI roh ≥ 96 °C · GPU ≥ 85 °C · Prognose ≥ Grenze (1 s bestätigt; sofort ab Trend ≥ 93 °C) · Owner-Nachweis veraltet (CPU 1,5 s, Lüfter 12 s) · GPU-Takt über Lock · Speicher knapp</text>
+<text x="340" y="1111.5" font-size="12" fill="#222">Not-Aktionen: GPU 200–500 MHz · CPU-Minimum · Lüfter 12 · Readiness-Datei weg → Testlasten stoppen</text>
+<text x="340" y="1128.0" font-size="12" fill="#222">Danach SAFE_STATE im selben Prozess: Status läuft weiter, Warten bis alle Sensoren 5 °C unter Grenze (10 s), dann neu scharf (nichts startet Lasten automatisch)</text>
+<polyline points="155,945 155,1110 328,1110" fill="none" stroke="#c83a3a" stroke-width="1.6" marker-end="url(#arrR)"/>
+<text x="165" y="1102" font-size="11" fill="#c83a3a" text-anchor="start" font-style="italic">eigene Sensor-Abtastung</text>
+<polyline points="1420,450 1420,470 1560,470 1560,1080 1542,1080" fill="none" stroke="#c83a3a" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrR)"/>
+<polyline points="1440,830 1440,850 1560,850" fill="none" stroke="#c83a3a" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrR)"/>
+<text x="1450" y="866" font-size="11" fill="#c83a3a" text-anchor="start" font-style="italic">Nachweise</text>
+<polyline points="1480,1055 1480,1037" fill="none" stroke="#c83a3a" stroke-width="1.6" marker-end="url(#arrR)"/>
+<text x="1488" y="1050" font-size="11" fill="#c83a3a" text-anchor="start" font-style="italic">Not-Aktion an alle Owner</text>
+<rect x="20" y="1185" width="360" height="95" rx="8" fill="#f1f1f4" stroke="#6b6b78" stroke-width="1.6"/>
+<text x="30" y="1205" font-size="14" font-weight="700" fill="#6b6b78">Status 1 Hz (/run/spark-energy/status.json)</text>
+<text x="30" y="1225" font-size="11" fill="#222">Regler → Dashboard, Status-API (nur lesen)</text>
+<text x="30" y="1240.5" font-size="11" fill="#222">Modi: STARTING · RUN/RAMP/HOLD/REARM ·</text>
+<text x="30" y="1256.0" font-size="11" fill="#222"> SAFE_STATE (lückenlos, auch nach Abbruch)</text>
+<rect x="395" y="1185" width="380" height="95" rx="8" fill="#f1f1f4" stroke="#6b6b78" stroke-width="1.6"/>
+<text x="405" y="1205" font-size="14" font-weight="700" fill="#6b6b78">Operator-Broker (Passwort, Audit)</text>
+<text x="405" y="1225" font-size="11" fill="#222">Ziele, Maxima GPU/Cluster, Einstieg, Gains,</text>
+<text x="405" y="1240.5" font-size="11" fill="#222">Prioritäten, 33 Modell-Tunables – live</text>
+<text x="405" y="1256.0" font-size="11" fill="#222">→ Regler, bumpless (CLI --tune, Dashboard)</text>
+<rect x="790" y="1185" width="380" height="95" rx="8" fill="#f1f1f4" stroke="#6b6b78" stroke-width="1.6"/>
+<text x="800" y="1205" font-size="14" font-weight="700" fill="#6b6b78">Test-Override (boot-gebunden, root)</text>
+<text x="800" y="1225" font-size="11" fill="#222">/run/spark-energy/qualification.json</text>
+<text x="800" y="1240.5" font-size="11" fill="#222">jedes Live-Feld, wirksam in ~1 s, kein Neustart</text>
+<text x="800" y="1256.0" font-size="11" fill="#222">→ Regler; Broker gesperrt, solange aktiv</text>
+<rect x="1185" y="1185" width="355" height="95" rx="8" fill="#f1f1f4" stroke="#6b6b78" stroke-width="1.6"/>
+<text x="1195" y="1205" font-size="14" font-weight="700" fill="#6b6b78">Trace &amp; Evidenz</text>
+<text x="1195" y="1225" font-size="11" fill="#222">1-Hz-Trace (jsonl), Lauf-Logs,</text>
+<text x="1195" y="1240.5" font-size="11" fill="#222">Audit, Owner-Nachweise</text>
+<text x="1195" y="1256.0" font-size="11" fill="#222">Neustart nur bei Code-/Modelländerung</text>
+<rect x="1590" y="1185" width="230" height="95" rx="8" fill="#fff" stroke="#bbb"/>
+<rect x="1600" y="1197" width="14" height="11" fill="#e8f1ff" stroke="#3b6fd8"/>
+<text x="1620" y="1207" font-size="11" fill="#222">Sensor</text>
+<rect x="1600" y="1213" width="14" height="11" fill="#eef7f7" stroke="#2b8a8a"/>
+<text x="1620" y="1223" font-size="11" fill="#222">Abtastung/Schätzung</text>
+<rect x="1600" y="1229" width="14" height="11" fill="#eaf7ea" stroke="#2f8f3a"/>
+<text x="1620" y="1239" font-size="11" fill="#222">Regler</text>
+<rect x="1600" y="1245" width="14" height="11" fill="#fff3e6" stroke="#d17a1b"/>
+<text x="1620" y="1255" font-size="11" fill="#222">Owner-Prozess</text>
+<rect x="1600" y="1261" width="14" height="11" fill="#fdecec" stroke="#c83a3a"/>
+<text x="1620" y="1271" font-size="11" fill="#222">Guard / Schutz</text>
+</svg>

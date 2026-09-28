@@ -1,0 +1,53 @@
+diff --git a/docs/protocol.md b/docs/protocol.md
+index c29150f..1c1ec07 100644
+--- a/docs/protocol.md
++++ b/docs/protocol.md
+@@ -25,7 +25,7 @@ own services. It does not map the eSPI controller or access EC memory directly.
+ 
+ | Field | Accepted value |
+ | --- | --- |
+-| DMI vendor / product / board match | `NVIDIA` / `NVIDIA_DGX_Spark` / `P4242` |
++| DMI match | `NVIDIA` / `NVIDIA_DGX_Spark` / `P4242`, or qualified Lenovo `LENOVO` / `30KL0005GF` |
+ | Service UUID | `78b04d80-d21d-4986-8acb-467b60247ac5` |
+ | FF-A API | 1.2, 64-bit service |
+ | Partition ID / properties | `0x8003` / `0x0109` |
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+index 6d01143..d941b1e 100644
+--- a/docs/troubleshooting.md
++++ b/docs/troubleshooting.md
+@@ -20,8 +20,8 @@ format` requires inspecting the kernel log and rebuilding for the exact kernel.
+ 
+ The module can load while its device probe rejects an unsupported transport or
+ capability response. Read the kernel log; do not remove validation checks.
+-This implementation matches the NVIDIA P4242 platform only. Other GB10 boards
+-have not been qualified.
++This implementation matches NVIDIA P4242 and the qualified Lenovo ThinkStation
++PGX product `30KL0005GF`. Other GB10 boards have not been qualified.
+ 
+ An older experimental driver may already own the relay. Do not load multiple
+ fan drivers or run a direct packet client alongside the controller. Restore
+diff --git a/kernel/dgx_ec_fan_control.c b/kernel/dgx_ec_fan_control.c
+index 6168fc5..2f25a7c 100644
+--- a/kernel/dgx_ec_fan_control.c
++++ b/kernel/dgx_ec_fan_control.c
+@@ -187,9 +187,17 @@ static void dgx_ec_log_incident(struct dgx_ec_fan_control_data *data)
+ 
+ static bool dgx_ec_is_supported_platform(void)
+ {
+-	return dmi_match(DMI_SYS_VENDOR, "NVIDIA") &&
+-	       dmi_match(DMI_PRODUCT_NAME, "NVIDIA_DGX_Spark") &&
+-	       dmi_match(DMI_BOARD_NAME, "P4242");
++	bool nvidia_spark;
++	bool lenovo_pgx;
++
++	nvidia_spark = dmi_match(DMI_SYS_VENDOR, "NVIDIA") &&
++		       dmi_match(DMI_PRODUCT_NAME, "NVIDIA_DGX_Spark") &&
++		       dmi_match(DMI_BOARD_NAME, "P4242");
++	/* Lenovo reports the board name as INVALID on the qualified 30KL SKU. */
++	lenovo_pgx = dmi_match(DMI_SYS_VENDOR, "LENOVO") &&
++		     dmi_match(DMI_PRODUCT_NAME, "30KL0005GF");
++
++	return nvidia_spark || lenovo_pgx;
+ }
+ 
+ static int dgx_ec_validate_transport(struct ffa_device *ffa_dev,

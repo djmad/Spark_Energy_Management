@@ -1,0 +1,2 @@
+{"utc_ns": 1790418947037280224, "mono_ns": 54054088055536, "kind": "gpu_lock_intent", "minimum_mhz": 200, "maximum_mhz": 1200, "hard_maximum_mhz": 1800}
+{"utc_ns": 1790418947070309552, "mono_ns": 54054121085200, "kind": "gpu_lock_result", "returncode": 0, "accepted_numeric_readback": null}

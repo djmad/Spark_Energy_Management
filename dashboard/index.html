@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Spark Energy — GB10 thermal and power</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b12;
+      --surface: #101620;
+      --surface-2: #161e2b;
+      --surface-3: #1d2838;
+      --line: #2d3d52;
+      --text: #f3f7fc;
+      --muted: #a2afc0;
+      --mint: #57e3c3;
+      --mint-soft: rgba(87, 227, 195, .12);
+      --amber: #f6c76b;
+      --amber-soft: rgba(246, 199, 107, .12);
+      --red: #ff7d78;
+      --red-soft: rgba(255, 125, 120, .12);
+      --blue: #83a8ff;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .26);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      background: radial-gradient(circle at 12% -10%, rgba(54, 116, 142, .2), transparent 34rem),
+        radial-gradient(circle at 95% 8%, rgba(72, 70, 145, .14), transparent 30rem), var(--bg);
+      font: 14px/1.48 "Ubuntu Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button { font: inherit; color: inherit; }
+    p { margin: 0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .top { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+      padding: 12px 28px; border-bottom: 1px solid rgba(86, 109, 142, .34); background: rgba(8, 11, 18, .92); backdrop-filter: blur(14px); }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; color: #071612;
+      background: linear-gradient(145deg, #70f0d2, #4dc8e4); font-weight: 900; letter-spacing: -.06em; }
+    .brand h1 { margin: 0; font-size: 15px; letter-spacing: .01em; }
+    .brand small { display: block; color: var(--muted); font-size: 11px; }
+    .hdr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-left: auto; min-width: 0;
+      color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .hdr b { color: var(--text); font-weight: 650; }
+    .shell { width: min(1480px, 100%); margin: 0 auto; padding: 18px 28px 30px; }
+    .section { margin-top: 14px; border: 1px solid var(--line); border-radius: 18px; background: rgba(16, 22, 32, .9);
+      box-shadow: var(--shadow); padding: 0 16px 14px; }
+    .section > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 14px 0 10px; cursor: pointer;
+      list-style: none; font-weight: 740; font-size: 15px; }
+    .section > summary::-webkit-details-marker { display: none; }
+    .section > summary::before { content: '›'; color: var(--mint); font-size: 20px; line-height: 1; transition: transform .16s ease; }
+    .section[open] > summary::before { transform: rotate(90deg); }
+    .section > summary small { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 500;
+      text-overflow: ellipsis; white-space: nowrap; }
+    .cool-graphs-status { margin-bottom: 2px; }
+    .foot { margin-top: 16px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; }
+    .badge.ok { color: var(--mint); border-color: rgba(98,230,172,.35); background: var(--mint-soft); }
+    .badge.warn { color: var(--amber); border-color: rgba(246,199,107,.4); background: var(--amber-soft); }
+    .badge.bad { color: var(--red); border-color: rgba(255,125,120,.4); background: var(--red-soft); }
+    .kpi { padding: 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .kpi-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .kpi-value { margin-top: 7px; font-size: 24px; font-weight: 730; letter-spacing: -.03em; }
+    .kpi-foot { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .time-ticks { position: relative; height: 9px; color: var(--muted); font: 7.5px/9px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+    .time-ticks span { position: absolute; top: 0; transform: translateX(-50%); }
+    .time-ticks span.edge-start { transform: none; }
+    .time-ticks span.edge-end { transform: translateX(-100%); }
+    .cooling-head-right { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; min-width: 0; }
+    .cooling-mode { max-width: 100%; overflow: hidden; color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+    .cool-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+    .cool-chart { margin: 0; min-width: 0; padding: 8px 10px 7px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .cool-chart figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; min-width: 0; }
+    .cool-chart figcaption span { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
+    .cool-chart figcaption b { overflow: hidden; font-size: 14px; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
+    .cool-svg { display: block; width: 100%; height: 132px; overflow: hidden; }
+    .cool-svg .grid { stroke: rgba(158,190,185,.13); stroke-width: 1; }
+    .cool-svg .grid.split { stroke: rgba(158,190,185,.32); stroke-dasharray: 2 3; }
+    .cool-svg .axis-label { fill: var(--muted); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .cool-svg .ref-label { font: 8.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .cool-svg .trace { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+    .cool-svg .unavailable { fill: var(--muted); font-size: 11px; }
+    .cool-legend { display: flex; flex-wrap: wrap; gap: 1px 9px; margin-top: 4px; color: var(--muted); font: 9.5px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .cool-legend button, .cool-legend span { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+    .cool-legend button { cursor: pointer; }
+    .cool-legend button.off { opacity: .35; }
+    .cool-legend i { width: 11px; height: 0; border-top: 2px solid; }
+    .cool-legend i.dashed { border-top-style: dashed; }
+    .cool-legend b { color: var(--text); font-weight: 600; }
+    .cool-note { margin-top: 7px; color: var(--muted); font-size: 10.5px; line-height: 1.35; }
+    .load-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--muted); }
+    .load-dot.ok { background: var(--mint); box-shadow: 0 0 9px rgba(87,227,195,.58); }
+    .load-dot.warn { background: var(--amber); box-shadow: 0 0 9px rgba(246,199,107,.5); }
+    .load-dot.bad { background: var(--red); box-shadow: 0 0 9px rgba(255,125,120,.5); }
+    .tw-body { margin-top: 8px; }
+    .tw-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 8px; }
+    .tw-meta .badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tw-fig { margin: 0; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .tw-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tw-scroll svg { display: block; width: 100%; height: auto; min-width: 920px; transition: opacity .2s ease; }
+    .tw-fig.tw-stale svg { opacity: .42; }
+    .tw-hint { display: none; margin: 0 4px 4px; color: var(--muted); font-size: 10.5px; }
+    .tw-empty { padding: 28px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+    .tw-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+    .tw-kpis .kpi { min-width: 0; padding: 11px 12px; }
+    .tw-kpis .kpi-value { margin-top: 4px; font-size: 20px; font-variant-numeric: tabular-nums; }
+    .tw-kpis .kpi-foot { font-size: 10.5px; line-height: 1.38; }
+    .tw-svg .tw-head { font-size: 11px; font-weight: 750; letter-spacing: .14em; fill: var(--mint); }
+    .tw-svg .tw-title { font-size: 12.5px; font-weight: 700; fill: var(--text); }
+    .tw-svg .tw-big { font-size: 19px; font-weight: 750; letter-spacing: -.02em; }
+    .tw-svg .tw-val { font-size: 12.5px; font-weight: 700; fill: var(--text); }
+    .tw-svg .tw-sm { font-size: 10.5px; fill: var(--muted); }
+    .tw-svg .tw-sub { font-size: 11px; fill: var(--muted); }
+    .tw-svg .tw-fit { font-size: 10.5px; font-weight: 700; fill: var(--mint); }
+    .tw-svg .tw-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; fill: var(--muted); }
+    .tw-svg .tw-flow { font-size: 11.5px; font-weight: 700; fill: var(--text); paint-order: stroke; stroke: var(--surface); stroke-width: 3.5px; stroke-linejoin: round; }
+    .tw-svg .tw-flowsub { font-size: 10.5px; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 3.5px; stroke-linejoin: round; }
+    .tw-svg .tw-pkg { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; fill: var(--muted); }
+    .tw-svg .tw-src { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.3; }
+    .tw-svg .tw-accent { fill: var(--amber); }
+    .tw-svg .tw-bgpill { fill: var(--surface); }
+    .tw-svg .tw-line { stroke: var(--line); }
+    .tw-svg .tw-fan { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.3; }
+    .cool-legend button { cursor: pointer; }
+    @media (max-width: 1220px) { .cool-grid { grid-template-columns: 1fr 1fr; } .cool-svg { height: 108px; } }
+    @media (max-width: 980px) { .tw-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 919px) { .tw-hint { display: block; } }
+    @media (max-width: 720px) {
+      .top { padding: 10px 14px; } .hdr { margin-left: 0; gap: 4px 10px; font-size: 11px; }
+      .shell { padding: 12px 12px 24px; } .section { padding: 0 12px 12px; border-radius: 14px; }
+      .cool-grid { grid-template-columns: 1fr; gap: 6px; } .cool-chart { padding: 6px 8px 5px; border-radius: 10px; }
+      .cool-svg { height: 84px; } .cool-legend { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+      .cool-legend::-webkit-scrollbar { display: none; } .cool-legend button, .cool-legend span { flex: none; }
+    }
+    @media (max-width: 460px) { .tw-kpis .kpi { padding: 9px 10px; } .tw-kpis .kpi-value { font-size: 17px; } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><div class="brand-mark">SE</div><div><h1>Spark Energy — GB10 thermal and power</h1><small>read-only view of energy_control · live</small></div></div>
+    <div class="hdr" aria-live="polite"><span class="badge" id="hdr-live">connecting…</span><span id="hdr-mode">mode <b>—</b></span><span id="hdr-hot">hottest <b>—</b></span><span id="hdr-gpu">GPU <b>—</b></span><span id="hdr-fan">fan <b>—</b></span></div>
+  </header>
+  <main class="shell">
+      <details class="section tw-details" id="tw-details" open>
+        <summary>Digital twin – heat path <small id="tw-state">sources → contact plate → neck → fin block → room air · live only while open</small></summary>
+        <div class="tw-body">
+          <div class="tw-meta" id="tw-meta" aria-live="polite"></div>
+          <figure class="tw-fig" id="tw-fig">
+            <p class="tw-hint">Swipe the diagram sideways ↔</p>
+            <div class="tw-scroll" id="tw-mount"><div class="tw-empty">loading energy_control status …</div></div>
+          </figure>
+          <section class="tw-kpis" id="tw-kpis" aria-label="Twin heat balance"></section>
+        </div>
+      </details>
+      <details class="section" id="graphs" open>
+        <summary>History graphs <small>temperatures · fans · GPU clock · CPU clock · last 2 h</small></summary>
+        <div class="cooling-head-right cool-graphs-status"><span class="cooling-mode" id="cooling-mode"></span></div>
+        <div class="cool-grid">
+          <figure class="cool-chart"><figcaption><span>Temperatures °C</span><b id="cool-temp-now">—</b></figcaption><svg class="cool-svg" id="cool-temp-svg" role="img" aria-label="ACPI zone, GPU and board temperatures, last 2 hours"></svg><div class="time-ticks" id="cool-temp-ticks" aria-hidden="true"></div><div class="cool-legend" id="cool-temp-legend"></div></figure>
+          <figure class="cool-chart"><figcaption><span>Fans</span><b id="cool-fan-now">—</b></figcaption><svg class="cool-svg" id="cool-fan-svg" role="img" aria-label="Fan speeds and fan floor, last 2 hours"></svg><div class="time-ticks" id="cool-fan-ticks" aria-hidden="true"></div><div class="cool-legend" id="cool-fan-legend"></div></figure>
+          <figure class="cool-chart"><figcaption><span>GPU clock MHz</span><b id="cool-gpu-now">—</b></figcaption><svg class="cool-svg" id="cool-gpu-svg" role="img" aria-label="Measured GPU clock and energy_control GPU cap, last 2 hours"></svg><div class="time-ticks" id="cool-gpu-ticks" aria-hidden="true"></div><div class="cool-legend" id="cool-gpu-legend"></div></figure>
+          <figure class="cool-chart"><figcaption><span>CPU clock MHz</span><b id="cool-cpu-now">—</b></figcaption><svg class="cool-svg" id="cool-cpu-svg" role="img" aria-label="Measured P-core and E-core clocks and energy_control caps, last 2 hours"></svg><div class="time-ticks" id="cool-cpu-ticks" aria-hidden="true"></div><div class="cool-legend" id="cool-cpu-legend"></div></figure>
+        </div>
+        <p class="cool-note">Source: energy_control only (status.json, ~1 Hz; this page polls every 2 s). Time axis: right half last 15 min (log), left half 15 min–2 h (linear). Click a legend entry to toggle a trace. The green area is utilisation on its own 0–100 % scale.</p>
+      </details>
+      <p class="foot">Read-only. This page reads the status that energy_control publishes and never talks to the hardware. The model behind the digital twin is documented in the project's dashboard/README.md.</p>
+  </main>
+  <script>
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    function setBadge(el, text, state=''){ el.textContent=text; el.className='badge'+(state?' '+state:''); }
+
+    // ---- Shared piecewise time axis for every history graph --------------------------------
+    // "now" sits on the right edge. Right half: last 15 min on a log scale (log1p with a 2 s
+    // knee, so seconds near now get most pixels). Left half: 15 min–2 h, linear. Both halves
+    // meet at x = 0.5 for age 15 min (continuous); their slopes there differ by only ~14 %.
+    const TIME_AXIS={spanMs:2*3600e3, splitMs:15*60e3, tauMs:2000};
+    // Label priority order; lower-priority labels are dropped when they would collide.
+    const TIME_TICKS=[[0,'now'],[900e3,'15m'],[7200e3,'2h'],[60e3,'1m'],[3600e3,'1h'],[300e3,'5m'],[10e3,'10s'],[1800e3,'30m']];
+    function timeAxisX(ageMs){ // fraction 0 (2 h ago, left) … 1 (now, right); null when older
+      const {spanMs,splitMs,tauMs}=TIME_AXIS, age=Math.max(0,Number(ageMs)||0);
+      if(age>spanMs) return null;
+      if(age<=splitMs) return 1-0.5*Math.log1p(age/tauMs)/Math.log1p(splitMs/tauMs);
+      return 0.5*(spanMs-age)/(spanMs-splitMs);
+    }
+    function timeTicks(widthPx,minGapPx=22){ // priority order; drop labels that would collide
+      const chosen=[];
+      for(const [age,label] of TIME_TICKS){ const f=timeAxisX(age); if(chosen.every(t=>Math.abs(t.f-f)*widthPx>=minGapPx)) chosen.push({age,label,f}); }
+      return chosen.sort((a,b)=>a.f-b.f);
+    }
+    function renderTimeTicks(el){ // el spans exactly the plot's x range; returns ticks for gridlines
+      const width=el?.clientWidth||0; if(!width) return [];
+      const ticks=timeTicks(width);
+      el.innerHTML=ticks.map(t=>`<span class="${t.f<=0?'edge-start':t.f>=1?'edge-end':''}" style="left:${(t.f*100).toFixed(2)}%">${t.label}</span>`).join('');
+      return ticks;
+    }
+    function historyGapMs(tiers,ageMs){ // break a trace when samples are further apart than 3 steps
+      const list=Array.isArray(tiers)&&tiers.length?tiers:[[TIME_AXIS.spanMs,5000]];
+      const step=(list.find(([maxAge])=>ageMs<=maxAge)||list[list.length-1])[1];
+      return 3*step+500;
+    }
+    function tracePath(points,now,tiers,xOf,yOf,stepped=false){ // points: [[t,value],…] ascending t
+      let d='', prevT=null, last=null;
+      for(const [t,v] of points){
+        const ts=Number(t), value=v==null?NaN:Number(v), f=Number.isFinite(ts)?timeAxisX(now-ts):null;
+        if(!Number.isFinite(value)||f==null){ prevT=null; continue; }
+        const x=xOf(f), y=yOf(value), join=prevT!=null&&ts-prevT<=historyGapMs(tiers,now-prevT);
+        if(join&&stepped) d+=`H${x.toFixed(1)} `;
+        d+=`${join?'L':'M'}${x.toFixed(1)} ${y.toFixed(1)} `;
+        prevT=ts; last={x,y,value,t:ts};
+      }
+      return {d:d.trim(), last};
+    }
+
+    // Closes each gap-separated segment of a tracePath line down to the baseline.
+    function areaPath(d,baseY){
+      return d.split('M').filter(Boolean).map(seg=>{
+        const n=seg.replace(/[LH]/g,' ').trim().split(/\s+/).map(Number), pts=[];
+        for(let i=0;i+1<n.length;i+=2) pts.push([n[i],n[i+1]]);
+        if(pts.length<2) return '';
+        return `M${pts[0][0].toFixed(1)} ${baseY.toFixed(1)}`+pts.map(([x,y])=>`L${x.toFixed(1)} ${y.toFixed(1)}`).join('')+`L${pts[pts.length-1][0].toFixed(1)} ${baseY.toFixed(1)}Z`;
+      }).join('');
+    }
+
+
+    // ---- Cooling card: energy_control status history (server samples ~1 Hz, 2 h) ------------
+    const COOL_CHARTS={
+      temp:{unit:'°C',digits:1,yMin:20,yMax:100,yTicks:[20,40,60,80,100],series:[
+        {key:'TSOC',label:'TSOC',title:'Package / hot-spot (tracks the hottest cluster)',color:'#f3f7fc',width:2},
+        {key:'TS0P',label:'TS0P',title:'Cluster 0 P-cores (CPUs 5-9)',color:'#ff7d78'},
+        {key:'TS1P',label:'TS1P',title:'Cluster 1 P-cores (CPUs 15-19)',color:'#f6a04d'},
+        {key:'TS0E',label:'TS0E',title:'Cluster 0 E-cores (CPUs 0-4)',color:'#83a8ff'},
+        {key:'TS1E',label:'TS1E',title:'Cluster 1 E-cores (CPUs 10-14)',color:'#5ec8f0'},
+        {key:'TUNC',label:'TUNC',title:'Uncore',color:'#b39ddb'},
+        {key:'TGPU',label:'TGPU',title:'ACPI GPU zone',color:'#57e3c3'},
+        {key:'gpuT',label:'GPU',title:'GPU temperature (NVML via energy_control)',color:'#c3f584'},
+        {key:'nvme',label:'NVMe',title:'NVMe drive · slow board reference',color:'#8b98a9',dash:'3 3',width:1},
+        {key:'wifi',label:'Wi-Fi',title:'Wi-Fi chip · slow board reference',color:'#6f7d92',dash:'1 3',width:1}]},
+      fan:{unit:'rpm',digits:0,yMin:0,series:[
+        {key:'rpm1',label:'Fan 1',title:'dgx_ec_fan fan1',color:'#83a8ff'},
+        {key:'rpm2',label:'Fan 2',title:'dgx_ec_fan fan2',color:'#57e3c3'},
+        {key:'floor',label:'Floor',title:'energy_control fan floor 0–12 (plotted on a 0–12 scale)',color:'#f6c76b',dash:'4 3',stepped:true,scale:[0,12],unit:'/12',width:1.3}]},
+      gpu:{unit:'MHz',digits:0,yMin:0,series:[
+        {key:'gpuMhz',label:'measured',title:'Measured GPU graphics clock',color:'#57e3c3'},
+        {key:'gpuCap',label:'cap',title:'energy_control GPU clock cap',color:'#f6c76b',dash:'4 3',stepped:true,width:1.3},
+        {key:'gpuUtil',label:'load',title:'GPU utilisation (nvidia-smi via energy_control), 0–100 % on its own scale: bottom = 0 %, top = 100 %',color:'#8ee88a',scale:[0,100],unit:'%',digits:0,width:1,area:true}],
+        extra:[{key:'gpuW',label:'power',unit:'W',digits:0}]},
+      cpu:{unit:'MHz',digits:0,yMin:0,yMax:4000,yTicks:[0,1000,2000,3000,4000],series:[
+        {key:'p0Mhz',label:'P0',title:'Measured clock, P0 cluster (CPUs 5-9); matches its cap 1:1 under load unless the vendor limits it',color:'#ff7d78'},
+        {key:'capP0',label:'P0 cap',title:'energy_control cap, P0 cluster',color:'#ff7d78',dash:'4 3',stepped:true,width:1.1},
+        {key:'p1Mhz',label:'P1',title:'Measured clock, P1 cluster (CPUs 15-19)',color:'#ffb35c'},
+        {key:'capP1',label:'P1 cap',title:'energy_control cap, P1 cluster',color:'#ffb35c',dash:'4 3',stepped:true,width:1.1},
+        {key:'e0Mhz',label:'E0',title:'Measured clock, E0 cluster (CPUs 0-4)',color:'#83a8ff'},
+        {key:'capE0',label:'E0 cap',title:'energy_control cap, E0 cluster',color:'#83a8ff',dash:'4 3',stepped:true,width:1.1},
+        {key:'e1Mhz',label:'E1',title:'Measured clock, E1 cluster (CPUs 10-14)',color:'#b69cff'},
+        {key:'capE1',label:'E1 cap',title:'energy_control cap, E1 cluster',color:'#b69cff',dash:'4 3',stepped:true,width:1.1},
+        {key:'cpuUtil',label:'load',title:'CPU utilisation, all 20 cores (energy_control), 0–100 % on its own scale: bottom = 0 %, top = 100 %',color:'#8ee88a',scale:[0,100],unit:'%',digits:0,width:1,area:true}],
+        extra:[{key:'cpuW',label:'~power',unit:'W (est.)',digits:0}]},
+    };
+    const COOL_ZONES=['TSOC','TS0E','TS0P','TS1E','TS1P','TGPU','TUNC'];
+    const coolHidden=new Set();
+    let cooling={fields:null,rows:[],tiers:null,status:null,limits:{},asOf:0,fullAt:0}, coolingLoading=false;
+    const fmtValue=(value,digits)=>value==null||!Number.isFinite(Number(value))?'—':Number(value).toFixed(digits);
+    function niceMax(value,step){ return Math.max(step,Math.ceil(value/step)*step); }
+
+    function drawCoolChart(name,cfg,refs){
+      const svg=$(`cool-${name}-svg`), W=svg.clientWidth, H=svg.clientHeight; if(!W||!H) return;
+      const gutter=30, padR=4, top=6, bottom=4, plotW=W-gutter-padR, plotH=H-top-bottom;
+      const {yMin,yMax}=cfg, span=(yMax-yMin)||1;
+      const xOf=f=>gutter+f*plotW;
+      const yScale=(lo,hi)=>v=>top+(1-(Math.max(lo,Math.min(hi,v))-lo)/((hi-lo)||1))*plotH;
+      const yOf=yScale(yMin,yMax);
+      svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+      const strip=$(`cool-${name}-ticks`); strip.style.marginLeft=`${gutter}px`; strip.style.marginRight=`${padR}px`;
+      const parts=[];
+      for(const tick of renderTimeTicks(strip)) if(tick.age!==TIME_AXIS.splitMs) parts.push(`<path class="grid" d="M${xOf(tick.f).toFixed(1)} ${top}V${top+plotH}"></path>`);
+      parts.push(`<path class="grid split" d="M${xOf(timeAxisX(TIME_AXIS.splitMs)).toFixed(1)} ${top}V${top+plotH}"></path>`); // dashed 15 min boundary, always drawn
+      for(const value of cfg.yTicks){
+        const y=yOf(value).toFixed(1);
+        parts.push(`<path class="grid" d="M${gutter} ${y}H${gutter+plotW}"></path><text class="axis-label" x="${gutter-4}" y="${(Number(y)+3).toFixed(1)}" text-anchor="end">${value>=10000?`${value/1000}k`:value}</text>`);
+      }
+      for(const ref of refs){
+        if(ref.value==null||!Number.isFinite(Number(ref.value))||ref.value<yMin||ref.value>yMax) continue;
+        const y=yOf(ref.value), x=xOf(ref.at||0)+3, ly=ref.below?y+9:y-2.5;
+        parts.push(`<path d="M${gutter} ${y.toFixed(1)}H${gutter+plotW}" stroke="${ref.color}" stroke-width="1" stroke-dasharray="${ref.dash||'5 3'}" opacity=".8"></path><text class="ref-label" x="${x.toFixed(1)}" y="${ly.toFixed(1)}" fill="${ref.color}">${esc(ref.label)}</text>`);
+      }
+      const idx=Object.fromEntries((cooling.fields||[]).map((field,i)=>[field,i]));
+      let drawn=0;
+      for(const series of [...cfg.series.filter(s=>s.area),...cfg.series.filter(s=>!s.area)]){  // load areas behind
+        if(coolHidden.has(series.key)||idx[series.key]==null) continue;
+        const column=idx[series.key], map=series.scale?yScale(series.scale[0],series.scale[1]):yOf;
+        const {d,last}=tracePath(cooling.rows.map(row=>[row[0],row[column]]),cooling.asOf,cooling.tiers,xOf,map,!!series.stepped);
+        if(!d) continue; drawn++;
+        if(series.area) parts.push(`<path d="${areaPath(d,top+plotH)}" fill="${series.color}" fill-opacity=".14" stroke="none"></path>`);
+        parts.push(`<path class="trace" d="${d}" stroke="${series.color}" stroke-width="${series.width||1.5}"${series.area?' stroke-opacity=".75"':''}${series.dash?` stroke-dasharray="${series.dash}"`:''}></path>`);
+        if(last&&cooling.asOf-last.t<=5000) parts.push(`<circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="2" fill="${series.color}"></circle>`);
+      }
+      if(!drawn) parts.push(`<text class="unavailable" x="${(gutter+plotW/2).toFixed(1)}" y="${(top+plotH/2).toFixed(1)}" text-anchor="middle">energy_control status unavailable</text>`);
+      svg.innerHTML=parts.join('');
+    }
+
+    function renderCoolLegend(name,cfg,latest){
+      const items=cfg.series.map(series=>{
+        const value=latest?.[series.key], unit=series.unit??cfg.unit;
+        return `<button type="button" class="${coolHidden.has(series.key)?'off':''}" title="${esc(series.title||series.label)}" data-key="${series.key}"><i class="${series.dash?'dashed':''}" style="border-color:${series.color}"></i>${esc(series.label)} <b>${fmtValue(value,series.digits??cfg.digits)}</b>${unit==='/12'?'/12':unit==='%'?'%':''}</button>`;
+      });
+      for(const extra of cfg.extra||[]) items.push(`<span>${esc(extra.label)} <b>${fmtValue(latest?.[extra.key],extra.digits)}</b> ${esc(extra.unit)}</span>`);
+      $(`cool-${name}-legend`).innerHTML=items.join('');
+    }
+    function toggleCoolSeries(key){ if(coolHidden.has(key)) coolHidden.delete(key); else coolHidden.add(key); renderCooling(); }
+
+
+    // Header: live state, mode, hottest zone, GPU clock/power and fan floor from the latest history row.
+    function renderHeader(){
+      const st=cooling.status||{}, fields=cooling.fields||[], last=cooling.rows.length?cooling.rows[cooling.rows.length-1]:null;
+      const row=st.available&&last&&cooling.asOf-last[0]<=5000?Object.fromEntries(fields.map((f,i)=>[f,last[i]])):null;
+      const badge=$('hdr-live'), up=st.controller==null||st.controller==='running';
+      if(st.available&&up) setBadge(badge,`live · ${fmtValue(st.age_s,1)} s`,'ok');
+      else if(st.available) setBadge(badge,st.controller==='safe_state'?'safe state':st.controller,'warn');
+      else setBadge(badge,st.state?`stale · ${st.state}`:'connecting…',st.state?'bad':'');
+      badge.title=st.available?'energy_control status is fresh':`state: ${st.state||'unknown'}${st.age_s!=null?` · last update ${fmtValue(st.age_s,0)} s ago`:''}`;
+      let zone=null, zoneC=null;
+      if(row) for(const z of COOL_ZONES) if(row[z]!=null&&(zoneC==null||row[z]>zoneC)){ zone=z; zoneC=row[z]; }
+      const lim=cooling.limits||{};
+      $('hdr-mode').innerHTML=`mode <b>${esc(st.mode||'—')}</b>`; $('hdr-mode').title=st.reason||'';
+      $('hdr-hot').innerHTML=`hottest <b style="color:${zoneC==null?'':zoneC>=(lim.acpi_abort_c??96)?'var(--red)':zoneC>=(lim.cpu_target_c??92)?'var(--amber)':''}">${zone?`${zone} ${fmtValue(zoneC,1)} °C`:'—'}</b>`;
+      $('hdr-gpu').innerHTML=`GPU <b>${row?`${fmtValue(row.gpuMhz,0)} MHz · ${fmtValue(row.gpuW,1)} W`:'—'}</b>`;
+      $('hdr-fan').innerHTML=`fan <b>${row?`${fmtValue(row.floor,0)}/12`:'—'}</b>`;
+      $('cooling-mode').textContent=st.available&&(st.mode||st.reason)?[st.mode&&`mode ${st.mode}`,st.reason].filter(Boolean).join(' · '):'';
+    }
+
+    function renderCooling(){
+      renderHeader();
+      if(!$('graphs').open) return; // graphs closed: no chart redraws (hidden SVGs also measure 0 wide)
+      const status=cooling.status||{}, limits=cooling.limits||{}, fields=cooling.fields||[];
+      const lastRow=cooling.rows.length?cooling.rows[cooling.rows.length-1]:null;
+      const latest=status.available&&lastRow&&cooling.asOf-lastRow[0]<=5000?Object.fromEntries(fields.map((field,i)=>[field,lastRow[i]])):null;
+      // Headline values
+      const zones=latest?COOL_ZONES.map(zone=>[zone,latest[zone]]).filter(([,v])=>v!=null):[];
+      const hottest=zones.length?zones.reduce((a,b)=>b[1]>a[1]?b:a):null;
+      const tempNow=$('cool-temp-now');
+      tempNow.textContent=hottest?`${hottest[0]} ${fmtValue(hottest[1],1)} °C`:'—';
+      tempNow.style.color=!hottest?'':hottest[1]>=(limits.acpi_abort_c??96)?'var(--red)':hottest[1]>=(limits.cpu_target_c??92)?'var(--amber)':'';
+      $('cool-fan-now').textContent=latest&&(latest.rpm1!=null||latest.rpm2!=null)?`${fmtValue(latest.rpm1,0)} / ${fmtValue(latest.rpm2,0)} rpm`:'—';
+      $('cool-gpu-now').textContent=latest&&latest.gpuMhz!=null?`${fmtValue(latest.gpuMhz,0)}${latest.gpuCap!=null?` / cap ${fmtValue(latest.gpuCap,0)}`:''}`:'—';
+      const cpuNow=$('cool-cpu-now');
+      cpuNow.textContent=!latest?'—':latest.p0Mhz!=null
+        ?`P0 ${fmtValue(latest.p0Mhz,0)} · P1 ${fmtValue(latest.p1Mhz,0)} · E ${fmtValue(Math.max(latest.e0Mhz??0,latest.e1Mhz??0),0)}${latest.vendor?' · ⚠ vendor limit':''}`
+        :(latest.pMhz!=null||latest.eMhz!=null)?`P ${fmtValue(latest.pMhz,0)} · E ${fmtValue(latest.eMhz,0)}`:'—';
+      cpuNow.style.color=latest&&latest.vendor?'var(--amber)':'';
+      cpuNow.title='Under load each cluster runs 1:1 at its cap; a lasting gap is flagged as a vendor (firmware) limit.';
+      // Dynamic ranges for fans and GPU clock
+      const colMax=key=>{ const i=fields.indexOf(key); let max=0; if(i<0) return max; for(const row of cooling.rows){ const v=Number(row[i]); if(row[i]!=null&&Number.isFinite(v)&&v>max) max=v; } return max; };
+      const fan=COOL_CHARTS.fan; fan.yMax=niceMax(Math.max(8000,colMax('rpm1'),colMax('rpm2'))*1.05,1000); fan.yTicks=[0,fan.yMax/2,fan.yMax];
+      const gpu=COOL_CHARTS.gpu; gpu.yMax=niceMax(Math.max(limits.gpu_max_mhz||3003,colMax('gpuMhz'),colMax('gpuCap')),500); gpu.yTicks=[];
+      for(let v=0;v<=gpu.yMax;v+=1000) gpu.yTicks.push(v);
+      const refs={
+        temp:[
+          {value:limits.acpi_abort_c??96,label:`ACPI abort ${fmtValue(limits.acpi_abort_c??96,0)}`,color:'#ff7d78',dash:'5 3'},
+          {value:limits.cpu_target_c??92,label:`CPU target ${fmtValue(limits.cpu_target_c??92,0)}`,color:'#f6c76b',dash:'5 3',at:.25},
+          {value:limits.gpu_abort_c??85,label:`GPU abort ${fmtValue(limits.gpu_abort_c??85,0)}`,color:'#ff9f9b',dash:'2 3'},
+          {value:limits.gpu_target_c??75,label:`GPU target ${fmtValue(limits.gpu_target_c??75,0)}`,color:'#f6d99b',dash:'2 3',at:.25}],
+        fan:[],
+        gpu:[{value:limits.gpu_max_mhz,label:`max ${fmtValue(limits.gpu_max_mhz,0)}`,color:'#8b98a9',dash:'2 3',below:true},
+             {value:limits.gpu_entry_mhz,label:`entry ${fmtValue(limits.gpu_entry_mhz,0)}`,color:'#8b98a9',dash:'2 3',at:.3}],
+        cpu:[{value:limits.cpu_fast_max_mhz??3900,label:'P max 3900',color:'#b0707a',dash:'2 3',below:true},
+             {value:limits.cpu_slow_max_mhz??2808,label:'E max 2808',color:'#6f86b8',dash:'2 3'}],
+      };
+      for(const [name,cfg] of Object.entries(COOL_CHARTS)){ drawCoolChart(name,cfg,refs[name]); renderCoolLegend(name,cfg,latest); }
+    }
+
+    async function loadCooling(){
+      if(coolingLoading) return; coolingLoading=true;
+      try{
+        const lastT=cooling.rows.length?cooling.rows[cooling.rows.length-1][0]:null;
+        const full=!cooling.fields||lastT==null||Date.now()-cooling.fullAt>60000;
+        const response=await fetch(full?'api/cooling':`api/cooling?since_ms=${encodeURIComponent(lastT)}`,{cache:'no-store'});
+        if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data=await response.json(), rows=Array.isArray(data.rows)?data.rows:[];
+        if(full){ cooling.rows=rows; cooling.fullAt=Date.now(); }
+        else for(const row of rows) if(row[0]>cooling.rows[cooling.rows.length-1][0]) cooling.rows.push(row);
+        Object.assign(cooling,{fields:data.fields,tiers:data.tiers,status:data.status,limits:data.limits||{},asOf:Number(data.as_of_ms)||Date.now()});
+        const cutoff=cooling.asOf-(Number(data.window_ms)||TIME_AXIS.spanMs);
+        while(cooling.rows.length&&cooling.rows[0][0]<cutoff) cooling.rows.shift();
+      }catch(error){
+        cooling.status={available:false,state:`dashboard API unavailable (${error})`};
+      }finally{ coolingLoading=false; }
+      renderCooling();
+    }
+
+    async function loadCooling(){
+      if(coolingLoading) return; coolingLoading=true;
+      try{
+        const lastT=cooling.rows.length?cooling.rows[cooling.rows.length-1][0]:null;
+        const full=!cooling.fields||lastT==null||Date.now()-cooling.fullAt>60000;
+        const response=await fetch(full?'api/cooling':`api/cooling?since_ms=${encodeURIComponent(lastT)}`,{cache:'no-store'});
+        if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data=await response.json(), rows=Array.isArray(data.rows)?data.rows:[];
+        if(full){ cooling.rows=rows; cooling.fullAt=Date.now(); }
+        else for(const row of rows) if(row[0]>cooling.rows[cooling.rows.length-1][0]) cooling.rows.push(row);
+        Object.assign(cooling,{fields:data.fields,tiers:data.tiers,status:data.status,limits:data.limits||{},asOf:Number(data.as_of_ms)||Date.now()});
+        const cutoff=cooling.asOf-(Number(data.window_ms)||TIME_AXIS.spanMs);
+        while(cooling.rows.length&&cooling.rows[0][0]<cutoff) cooling.rows.shift();
+      }catch(error){
+        cooling.status={available:false,state:`dashboard API unavailable (${error})`};
+      }finally{ coolingLoading=false; }
+      renderCooling();
+    }
+
+    // Polling: the history feed every 2 s while the page is visible (header always, charts only while open).
+    for(const el of document.querySelectorAll('.cool-legend')) el.addEventListener('click',event=>{
+      const key=event.target.closest('button[data-key]')?.dataset.key; if(key) toggleCoolSeries(key);
+    });
+    setInterval(()=>{ if(!document.hidden)loadCooling(); },2000);
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden)loadCooling(); });
+    $('graphs').addEventListener('toggle',()=>{ if($('graphs').open){ if(cooling.fields)renderCooling(); loadCooling(); } });
+    let resizeTimer=null;
+    window.addEventListener('resize',()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(renderCooling,150); });
+    loadCooling();
+
+    // ---- Digital twin: 2D heat path (from mockups/twin-2d.html) -------------------------------
+    // Pure part, no DOM lookups and no I/O: TW.buildTwinState(status, opts) -> view model,
+    // TW.render(state, el) -> inline SVG, TW.renderSummary(state, el) -> KPI tiles.
+    // Data: energy_control's status only (GET api/energy/status); the dashboard reads no sensors.
+    // ==== tw-pure begin ====
+    const TW = (() => {
+      'use strict';
+      /* ================= TWIN CONSTANTS: update the fitted values here (single place) =================
+       * kind  fitted  = two-store sink fit, Spark_Energy_Management analysis/sink_fit.py (27 Sep 2026):
+       *                 room air fixed at 21 °C; trained on the night's fan-floor runs (floors 2–12 held,
+       *                 23 924 samples, RMS 1.02 K), validated on the evening's fan-12 burn-ins (holdout
+       *                 2.4 K, bias +0.9 K). Input: GPU power (measured) + CPU power (calorimetric-v2) +
+       *                 fitted background heat. A three-store fit collapsed to two stores.
+       *       measured = hardware measurement; assumed = no measurement behind it
+       * Model: plate  C_p dT_p/dt = P_in − G_n (T_p − T_f)
+       *        fins   C_f dT_f/dt = G_n (T_p − T_f) − G_a(floor) (T_f − T_room)
+       *        G_a(floor) = g0 + g1 × max(0.2, floor / 12);  TGPU = T_p + r × P_GPU
+       * (CPU power: calorimetric-v2, doc/55 §6); the three-part cooler follows the operator's teardown photo (27 Sep 2026). */
+      const K = Object.freeze({
+        fitLabel: 'fitted 27 Sep 2026 (holdout 2.4 K)',
+        fitShort: 'fitted',
+        ambientC: 21.0,          // measured: room air at the intake (operator, ~22:45); no live sensor
+        ambientNote: 'measured 22:45',
+        // GPU die sensors. fitted: TGPU sits r × P_GPU above the die/plate node (the fit's observation model)
+        hotspotKW: 0.52,         // fitted, K/W: plate ≈ TGPU − 0.52 × P_GPU (primary plate estimate)
+        gnodeWK: 1.9,            // older two-node fit (gpu_twin GB10_FIT): nvidia − P_GPU / 1.9 = cross-check / fallback
+        // (1) Die + primary copper plate on the GB10 die (GPU and CPU clusters): the fast store. fitted
+        plateJK: 28,             // fitted (replaces 165 J/K from the two-node fit with the ambient traded off)
+        copperJgK: 0.385,        // specific heat of Cu, J/(g·K): Cu-equivalent mass = C / c
+        // (2) Neck: small cross-section joining plate and fin block, a thermal bottleneck. fitted
+        neckWK: 3.45,            // fitted; plate τ = C_p / G_n ≈ 8 s
+        // (3) Fin block (black anodised fins, probably Al) + the case air it heats: the main store. fitted
+        finsJK: 272,             // fitted; τ = C_f / G_a ≈ 79 s at fan 12, 123 s at fan 2
+        aluminiumJgK: 0.897,     // specific heat of Al, J/(g·K): Al-equivalent mass = C / c
+        airBaseWK: 1.92,         // fitted: fins -> room air, fan-independent part, W/K
+        airFanWK: 1.50,          // fitted: × max(0.2, floor / 12); 3.42 W/K at fan 12, 2.22 at fan 2
+        fanMinShare: 0.2,        // max(0.2, floor / 12); fitted range floors 2–12
+        slowTauS: [130, 240],    // earlier cool-downs: slow part (case), not separable in the fit (notes only)
+        // (4) Background heat: board, RAM, ConnectX NIC (own Cu plate, heatpipe into the fins), idle SoC. fitted;
+        //     booked into the plate as in the fit (P_in). The NIC share is unknown.
+        backgroundW: 12.3,       // fitted (previously assumed "Sonstiges" 8 W)
+        // Fans: index into status fan.rpm. Mapping derived from the RPM at floor 12 ([9000, 13500]).
+        fanLeftSlowIdx: 0,       // left, NIC side, slow (~9000 rpm)
+        fanRightFastIdx: 1,      // right, near CPU/GPU, fast (~13500 rpm)
+        // Case interior (board_c, not on the cooler): Wi-Fi 33 -> 40 °C at about +20 W (operator)
+        caseWifiRiseK: 7, caseWifiRiseAtW: 20,
+        // CPU zones (cluster_twin.py): first-order lag; steady rise above the plate at full load
+        lag: Object.freeze({ P: Object.freeze({ upS: 2.0, downS: 1.0 }), E: Object.freeze({ upS: 1.5, downS: 1.0 }) }),
+        zoneGainC: Object.freeze({ P0: 56.8, P1: 63.4, E0: 27.0, E1: 27.0 }),
+        zoneGamma: 0.8,
+      });
+      // CPU power model: energy_control/power_estimate.py (CpuPowerModel "calorimetric-v2", doc/55 §6).
+      const CPU_MODEL = Object.freeze({
+        version: 'calorimetric v2 (27 Sep 2026, scale ±×2)',
+        exponent: 2.34,
+        baseW: 1.0,
+        clusters: Object.freeze({
+          E0: { idleW: 0.5, fullW: 1.86, fMaxMhz: 2808, cpus: '0–4', kind: 'E' },
+          P0: { idleW: 0.8, fullW: 13.02, fMaxMhz: 3900, cpus: '5–9', kind: 'P' },
+          E1: { idleW: 0.5, fullW: 1.86, fMaxMhz: 2808, cpus: '10–14', kind: 'E' },
+          P1: { idleW: 0.8, fullW: 13.02, fMaxMhz: 3900, cpus: '15–19', kind: 'P' },
+        }),
+      });
+      /* ===================================== end of twin constants ===================================== */
+      const STALE_S = 5;                                   // data older than this is marked stale
+      const CLUSTER_ORDER = ['E0', 'P0', 'E1', 'P1'];      // order of control.cluster_setpoints_c
+      const DISPLAY_CLUSTERS = ['P0', 'P1', 'E0', 'E1'];   // top-to-bottom in the diagram
+      const ZONE_OF = { P0: 'TS0P', P1: 'TS1P', E0: 'TS0E', E1: 'TS1E' };
+
+      const num = v => (typeof v === 'number' && Number.isFinite(v)) ? v : null;
+      const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+      const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+      const first = (...vals) => { for (const v of vals) if (num(v) !== null) return v; return null; };
+      const r1 = v => num(v) === null ? null : Math.round(v * 10) / 10;
+
+      /* ---------- formatting (English, no digit grouping) ---------- */
+      function fmt(v, d = 1) {
+        if (num(v) === null) return '—';
+        return v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: false });
+      }
+      function signed(v, d = 1) {
+        if (num(v) === null) return '—';
+        return (v >= 0 ? '+' : '−') + fmt(Math.abs(v), d);
+      }
+      function fmtC(v) { return num(v) === null ? '— °C' : `${fmt(v, Number.isInteger(v) ? 0 : 1)} °C`; }
+      function fmtW(v, kind) { return num(v) === null ? '— W' : `${kind === 'measured' ? '' : '~'}${fmt(v, 1)} W`; }
+      const fmtWh = j => num(j) === null ? '— Wh' : `${fmt(j / 3600, 2)} Wh`;
+      const fmtKJ = (j, d = 1) => num(j) === null ? '— kJ' : `${fmt(j / 1000, d)} kJ`;
+      const storeJ = (capJK, tempC, ambientC) =>   // energy a store holds above the air: E = C × (T − T_air)
+        (num(capJK) === null || num(tempC) === null || num(ambientC) === null) ? null : capJK * Math.max(0, tempC - ambientC);
+
+      /**
+       * buildTwinState(status, opts) -> TwinState   (pure: no DOM, no I/O)
+       * status: energy_control status (/run/spark-energy/status.json schema); every field optional.
+       * opts:   { ageS?: seconds since publication (server age + client wait), nowMs?: fallback for the
+       *           age from utc_ns, state?: 'fresh'|'stale'|'missing'|'invalid', ambientC?: default 27 (assumed) }
+       * TwinState: { meta, limits, sources[], nodes{hot,gnode,zP0..zE1,plate,fins,nic,ambient}, flows[],
+       *              sensors[], fan, balance, cpu, notes[] }
+       * notes[] are model diagnostics only; the view does not show them (model docs: dashboard/README.md).
+       */
+      function buildTwinState(status, opts = {}) {
+        const s = obj(status);
+        const gpu = obj(s.gpu), cpu = obj(s.cpu), fan = obj(s.fan), zones = obj(s.zones_c);
+        const board = obj(s.board_c), clocks = obj(s.clocks), limits = obj(s.limits), control = obj(s.control);
+        const ambientC = first(opts.ambientC, K.ambientC);
+        const notes = [];
+
+        /* Limits and targets: published values first; fallbacks are the stricter documented ones. */
+        const setpoints = Array.isArray(control.cluster_setpoints_c) ? control.cluster_setpoints_c : [];
+        const lim = {
+          acpiAbortC: first(limits.acpi_abort_c, 93),
+          gpuAbortC: first(limits.gpu_abort_c, 85),
+          gpuTargetC: first(limits.gpu_target_c, 75),
+          gpuZoneSetpointC: first(control.gpu_zone_setpoint_c),
+          cpuCeilingC: first(control.cpu_setpoint_c, limits.cpu_target_c),
+        };
+        const clusterSetpoint = name => first(setpoints[CLUSTER_ORDER.indexOf(name)], lim.cpuCeilingC);
+
+        /* ---- GPU (measured by energy_control) ---- */
+        const gpuW = num(gpu.power_w), nvidiaC = num(gpu.temp_c), gpuClock = obj(clocks.gpu);
+        const gpuMhz = first(gpu.measured_mhz, gpuClock.measured_mhz);
+        const gpuCap = first(gpu.cap_mhz, gpuClock.requested_mhz);
+        const gpuUtil = first(gpu.util_pct, gpuClock.util_pct);
+
+        /* ---- CPU clusters (estimated, power_estimate.py) ---- */
+        const utilAll = num(cpu.util_pct), clusterCaps = obj(cpu.cluster_caps_mhz);
+        let utilFallback = false;
+        const clusters = DISPLAY_CLUSTERS.map(name => {
+          const m = CPU_MODEL.clusters[name], c = obj(clocks[name]);
+          let util = num(c.util_pct);
+          if (util === null && utilAll !== null) { util = utilAll; utilFallback = true; }
+          const mhz = first(c.measured_mhz, m.kind === 'P' ? cpu.p_mhz : cpu.e_mhz);
+          const capMhz = first(c.requested_mhz, clusterCaps[name]);
+          let modelW = null;
+          if (util !== null && mhz !== null) {
+            const ratio = clamp(mhz / m.fMaxMhz, 0, 1), load = clamp(util / 100, 0, 1);
+            modelW = m.idleW + (m.fullW - m.idleW) * load * ratio ** CPU_MODEL.exponent;
+          }
+          return { name, m, util, mhz, capMhz, modelW, powerW: null };
+        });
+        const modelComplete = clusters.every(c => c.modelW !== null);
+        const modelSum = modelComplete ? clusters.reduce((a, c) => a + c.modelW, 0) : null;
+        const estTotal = num(cpu.est_power_w);
+        let scale = 1, cpuSource = 'model';
+        if (estTotal !== null) {
+          const dyn = Math.max(0, estTotal - CPU_MODEL.baseW);
+          if (modelComplete && modelSum > 0) {
+            scale = dyn / modelSum; cpuSource = 'energy_control';
+            clusters.forEach(c => { c.powerW = c.modelW * scale; });
+          } else {  // no clocks/util: split by the clusters' full-load power
+            const fullSum = clusters.reduce((a, c) => a + c.m.fullW, 0);
+            clusters.forEach(c => { c.powerW = dyn * c.m.fullW / fullSum; });
+            cpuSource = 'energy_control (split evenly)';
+            notes.push('No per-cluster clocks or utilisation in the status: CPU total split by full-load share.');
+          }
+        } else {
+          clusters.forEach(c => { c.powerW = c.modelW; });
+        }
+        const cpuTotalW = clusters.every(c => c.powerW !== null)
+          ? CPU_MODEL.baseW + clusters.reduce((a, c) => a + c.powerW, 0) : null;
+        if (utilFallback) notes.push('No per-cluster utilisation in the status: total utilisation used for every cluster (coarser CPU estimate).');
+        if (cpuSource === 'energy_control' && Math.abs(scale - 1) > 0.05) {
+          notes.push(`CPU total from energy_control (est_power_w ${fmt(estTotal, 1)} W); cluster split by the model, scaled ×${fmt(scale, 2)}.`);
+        }
+
+        /* ---- Heat input into the plate (as in the fit): GPU (measured) + CPU (estimated) + background (fitted) ---- */
+        const inParts = [gpuW, cpuTotalW, K.backgroundW];
+        const inW = inParts.every(v => v !== null) ? inParts.reduce((a, v) => a + v, 0) : null;
+
+        /* ---- (1) Die + primary plate (fast store): the fit's observation model TGPU = T_p + 0.52 K/W × P_GPU,
+         *      so T_p ≈ TGPU − 0.52 × P_GPU. Cross-check (older two-node fit): nvidia − P_GPU / 1.9. ---- */
+        const tgpuC = num(zones.TGPU);
+        const plateFromTgpu = (tgpuC !== null && gpuW !== null) ? tgpuC - K.hotspotKW * gpuW : null;
+        const plateFromNvidia = (nvidiaC !== null && gpuW !== null) ? nvidiaC - gpuW / K.gnodeWK : null;
+        const plateC = plateFromTgpu !== null ? plateFromTgpu : plateFromNvidia;
+        const plateSource = plateFromTgpu !== null ? 'tgpu' : plateFromNvidia !== null ? 'nvidia' : null;
+        const crossK = (plateFromTgpu !== null && plateFromNvidia !== null) ? plateFromNvidia - plateFromTgpu : null;
+        if (plateSource === 'nvidia') notes.push('TGPU missing: plate estimated from nvidia − P/1.9 instead (older two-node model).');
+        if (crossK !== null && Math.abs(crossK) > 5) notes.push(`Cross-check: nvidia − P/1.9 = ${fmt(plateFromNvidia, 1)} °C is ${signed(crossK)} K off the plate estimate from TGPU (${fmt(plateFromTgpu, 1)} °C). Under GPU load TGPU runs above nvidia; the fit uses TGPU.`);
+
+        /* ---- Fans: fins -> room air, G = g0 + g1 × max(0.2, floor / 12) (fitted on floors 2–12) ---- */
+        const floor = num(fan.floor);
+        const rpm = Array.isArray(fan.rpm) ? fan.rpm.map(num) : [];
+        const share = floor === null ? null : Math.max(K.fanMinShare, clamp(floor / 12, 0, 1));
+        const gFan = share === null ? null : K.airFanWK * share;
+        const gAir = gFan === null ? null : K.airBaseWK + gFan;
+
+        /* ---- (3) Fin block + case air (main store): no sensor. Model estimate: the plate is fast
+         *      (τ = C_p / G_n ≈ 8 s) against the fins (τ ≈ 79–123 s), so it is quasi-stationary:
+         *      P_in = G_n (T_p − T_f)  ->  T_f = T_p − P_in / G_n, bounded to [T_room, T_p].
+         *      The charge rate (P_in − removal) therefore goes into the fin block. ---- */
+        const dPlateK = plateC === null ? null : plateC - ambientC;
+        let finsC = (plateC === null || inW === null) ? null : plateC - inW / K.neckWK;
+        let finsBounded = false;
+        if (finsC !== null) {
+          const lo = ambientC, hi = Math.max(ambientC, plateC);
+          if (finsC < lo || finsC > hi) { finsC = clamp(finsC, lo, hi); finsBounded = true; }
+        }
+        const dFinsK = finsC === null ? null : finsC - ambientC;
+        const neckW = finsC === null ? null : Math.max(0, plateC - finsC) * K.neckWK;
+        const airW = (dFinsK === null || gAir === null) ? null : Math.max(0, dFinsK) * gAir;
+        if (dPlateK !== null && dPlateK < 0) notes.push(`Plate estimate is below the room air (${fmt(ambientC, 0)} °C, ${K.ambientNote}); heat flows set to 0.`);
+        else if (finsBounded) notes.push(`Fin block estimate T_plate − P_in / ${fmt(K.neckWK, 2)} W/K was outside [room air, plate] and was bounded: the load is changing (plate τ ≈ ${fmt(K.plateJK / K.neckWK, 0)} s), or the input power or plate estimate is off.`);
+        if (floor !== null && floor < 2) notes.push(`Fan floor ${fmt(floor, 0)} is below the fitted range (floor 2–12); the conductance is taken as at floor 2.`);
+
+        /* ---- Balance on the whole cooler (plate + fins) ---- */
+        const outW = airW;
+        const storeW = (inW !== null && outW !== null) ? inW - outW : null;   // charge (+) / discharge (−) rate
+        const tolW = inW === null ? null : Math.max(3, 0.06 * inW);
+        const balState = storeW === null ? 'unknown'
+          : storeW > tolW ? 'charging' : storeW < -tolW ? 'discharging' : '≈ steady';
+        const plateTauS = K.plateJK / K.neckWK;
+        const finsTauS = gAir ? K.finsJK / gAir : null;
+        const finsSteadyC = (inW !== null && gAir) ? ambientC + inW / gAir : null;
+        const plateSteadyC = finsSteadyC === null ? null : finsSteadyC + inW / K.neckWK;
+        // A store holds energy, not power: E = C × (T − T_room). The watts are only its charge rate.
+        const plateJ = storeJ(K.plateJK, plateC, ambientC);
+        const finsJ = storeJ(K.finsJK, finsC, ambientC);
+        const coolerJ = (plateJ === null || finsJ === null) ? null : plateJ + finsJ;
+        const toSteadyJ = (plateSteadyC === null || plateJ === null || finsJ === null) ? null
+          : storeJ(K.plateJK, plateSteadyC, ambientC) + storeJ(K.finsJK, finsSteadyC, ambientC) - coolerJ;
+        if (storeW !== null && Math.abs(storeW) > tolW) {
+          notes.push(`Cooler not steady: ${signed(storeW)} W ${storeW > 0 ? 'charge' : 'discharge'} the fin-block store (${signed(storeW / K.finsJK, 3)} K/s; ${signed(toSteadyJ === null ? null : toSteadyJ / 1000, 1)} kJ to steady state). `
+            + `It settles with τ ≈ ${fmt(finsTauS, 0)} s; if the offset persists, the input power or plate estimate is off.`);
+        }
+
+        /* ---- Sensors (where they sit, their limit and headroom) ---- */
+        const sensors = [];
+        const addSensor = (id, label, where, valueC, targetC, abortC, desc) => {
+          const v = num(valueC);
+          const headroomK = (v !== null && abortC !== null) ? abortC - v : null;
+          const level = v === null ? 'missing'
+            : (abortC !== null && v >= abortC) ? 'abort'
+            : (abortC !== null && v >= abortC - 3) ? 'near abort'
+            : (targetC !== null && v > targetC) ? 'above target' : 'ok';
+          sensors.push({ id, label, where, valueC: v, targetC, abortC, headroomK, level, desc });
+        };
+        addSensor('TGPU', 'TGPU', 'hot', zones.TGPU, lim.gpuZoneSetpointC, lim.acpiAbortC, 'GPU die hotspot (ACPI)');
+        addSensor('nvidia', 'nvidia', 'gnode', nvidiaC, lim.gpuTargetC, lim.gpuAbortC, 'GPU sensor (nvidia-smi, whole degrees)');
+        for (const name of DISPLAY_CLUSTERS) {
+          const m = CPU_MODEL.clusters[name];
+          addSensor(ZONE_OF[name], ZONE_OF[name], 'z' + name, zones[ZONE_OF[name]], clusterSetpoint(name), lim.acpiAbortC,
+            `${m.kind} cluster ${name} (CPUs ${m.cpus}, ACPI)`);
+        }
+        addSensor('TUNC', 'TUNC', 'base', zones.TUNC, null, lim.acpiAbortC, 'Uncore (ACPI)');
+        addSensor('TSOC', 'TSOC', 'package', zones.TSOC, null, lim.acpiAbortC, 'SoC maximum (ACPI, firmware)');
+        addSensor('wifi', 'Wi-Fi', 'case', board.wifi, null, null, 'Wi-Fi module: case air, not on the cooler (reference, not in the control loop)');
+        addSensor('nvme', 'NVMe', 'case', board.nvme, null, null, 'NVMe SSD: case air, not on the cooler (reference, not in the control loop)');
+        if (num(board.wifi) === null && num(board.nvme) === null) notes.push('Case air (Wi-Fi, NVMe) not in the status; marked unavailable.');
+        const tsoc = num(zones.TSOC);
+        let tsocMatch = null;
+        if (tsoc !== null) {
+          for (const z of ['TGPU', 'TS0P', 'TS1P', 'TS0E', 'TS1E', 'TUNC']) {
+            if (num(zones[z]) !== null && Math.abs(zones[z] - tsoc) < 0.05) { tsocMatch = z; break; }
+          }
+        }
+
+        /* Twin vs. measurement per CPU zone (cluster_twin.py, steady state):
+         * zone = plate + gain × util^0.8 × (f / f_max)^1.7. Large residuals point at the plate
+         * estimate or at coupling the twin does not model. */
+        for (const c of clusters) {
+          const gain = K.zoneGainC[c.name];
+          c.twinC = (plateC !== null && c.util !== null && c.mhz !== null)
+            ? plateC + gain * clamp(c.util / 100, 0, 1) ** K.zoneGamma * clamp(c.mhz / c.m.fMaxMhz, 0, 1) ** CPU_MODEL.exponent
+            : null;
+          const measured = num(zones[ZONE_OF[c.name]]);
+          c.residualK = (c.twinC !== null && measured !== null) ? measured - c.twinC : null;
+        }
+        const off = clusters.filter(c => c.residualK !== null && Math.abs(c.residualK) > 6);
+        if (off.length) {
+          notes.push(`Measurement differs from the twin: ${off.map(c => `${ZONE_OF[c.name]} ${fmt(num(zones[ZONE_OF[c.name]]), 1)} °C measured vs. ${fmt(c.twinC, 1)} °C model (${signed(c.residualK)} K)`).join('; ')}. Possible causes: the plate estimate (TGPU − ${fmt(K.hotspotKW, 2)} K/W × P) or GPU→CPU coupling in the package that the twin does not model; the zone gains come from cluster_twin (older copper model).`);
+        }
+        const cpuMaxW = CPU_MODEL.baseW + Object.values(CPU_MODEL.clusters).reduce((a, m) => a + m.fullW, 0);
+        if (estTotal !== null && estTotal > cpuMaxW) {
+          notes.push(`est_power_w (${fmt(estTotal, 1)} W) is above the model maximum (${fmt(cpuMaxW, 0)} W); the model needs recalibration.`);
+        }
+
+        /* ---- Sources ---- */
+        const sources = [
+          { id: 'gpu', label: 'GPU die (GB10)', sub: null, powerW: gpuW, kind: 'measured',
+            lines: [`${fmt(gpuMhz, 0)} / ${fmt(gpuCap, 0)} MHz (actual / cap)`, `load ${fmt(gpuUtil, 0)} %`] },
+          ...clusters.map(c => ({
+            id: c.name, label: `${c.name} · CPU ${c.m.cpus}`, sub: c.m.kind === 'P' ? 'P cores' : 'E cores',
+            powerW: c.powerW, kind: 'estimated',
+            lines: [`${fmt(c.util, 0)} % · ${fmt(c.mhz, 0)} / ${fmt(c.capMhz, 0)} MHz`],
+          })),
+          { id: 'base', label: 'CPU base / uncore', sub: null, powerW: cpuTotalW === null ? null : CPU_MODEL.baseW,
+            kind: 'estimated', lines: [] },
+          { id: 'other', label: 'Background heat', sub: null, powerW: K.backgroundW, kind: 'fitted',
+            lines: ['board, RAM, NIC, idle SoC', 'NIC share: heatpipe → fin block'] },
+        ];
+
+        /* ---- Storage nodes ---- */
+        const nodes = {
+          // GPU die: two sensors on the die, which the fit lumps into the fast store (no own capacity).
+          die: { id: 'die', label: 'GPU die', tgpuC, nvidiaC, plateFromTgpu, plateFromNvidia, crossK, plateSource,
+            tgpuSetpointC: lim.gpuZoneSetpointC, nvidiaTargetC: lim.gpuTargetC, nvidiaAbortC: lim.gpuAbortC },
+          plate: { id: 'plate', label: 'Die + contact plate', tempC: plateC, kind: 'estimated', fitted: true,
+            capacityJK: K.plateJK, tauS: plateTauS, massG: K.plateJK / K.copperJgK, energyJ: plateJ, source: plateSource },
+          fins: { id: 'fins', label: 'Fin block', tempC: finsC, kind: 'model', fitted: true, bounded: finsBounded,
+            capacityJK: K.finsJK, tauS: finsTauS, massG: K.finsJK / K.aluminiumJgK, energyJ: finsJ },
+          nic: { id: 'nic', label: 'ConnectX-NIC', tempC: null, kind: 'assumed' },
+          ambient: { id: 'ambient', label: 'Room air', tempC: ambientC, kind: 'measured-once' },
+        };
+        for (const c of clusters) {
+          nodes['z' + c.name] = { id: 'z' + c.name, label: `Zone ${c.name}`, tempC: num(zones[ZONE_OF[c.name]]),
+            sensor: ZONE_OF[c.name], kind: 'measured', lag: K.lag[c.m.kind], setpointC: clusterSetpoint(c.name),
+            twinC: c.twinC, residualK: c.residualK };
+        }
+
+        /* ---- Heat flows (quasi-stationary inside the fast GPU chain and CPU zones) ---- */
+        const flows = [
+          { id: 'src-gpu', from: 'GPU power', to: 'GPU die', w: gpuW, kind: 'measured' },
+          { id: 'die-plate', from: 'GPU die (TGPU)', to: 'contact plate', w: gpuW, kind: 'measured', conductanceWK: 1 / K.hotspotKW },
+          ...clusters.flatMap(c => [
+            { id: `src-${c.name}`, from: `Cluster ${c.name}`, to: `Zone ${c.name}`, w: c.powerW, kind: 'estimated' },
+            { id: `z${c.name}-plate`, from: `Zone ${c.name}`, to: 'contact plate', w: c.powerW, kind: 'estimated' },
+          ]),
+          { id: 'base-plate', from: 'CPU base', to: 'contact plate', w: cpuTotalW === null ? null : CPU_MODEL.baseW, kind: 'estimated' },
+          { id: 'other-plate', from: 'Background heat', to: 'contact plate', w: K.backgroundW, kind: 'fitted' },
+          { id: 'neck', from: 'contact plate', to: 'fin block (neck)', w: neckW, kind: 'estimated', conductanceWK: K.neckWK },
+          { id: 'fins-air', from: 'fin block', to: 'room air', w: airW, kind: 'estimated', conductanceWK: gAir },
+          { id: 'nic-fins', from: 'NIC copper plate', to: 'fin block (heatpipe)', w: null, kind: 'assumed' },
+        ];
+
+        const utcMs = num(s.utc_ns) === null ? null : s.utc_ns / 1e6;
+        let ageS = num(opts.ageS);
+        if (ageS === null && utcMs !== null && num(opts.nowMs) !== null) ageS = (opts.nowMs - utcMs) / 1000;
+        const stale = (typeof opts.state === 'string' && opts.state !== 'fresh') || (ageS !== null && Math.abs(ageS) > STALE_S);
+
+        return {
+          meta: { mode: typeof s.mode === 'string' ? s.mode : null, reason: typeof s.reason === 'string' ? s.reason : null,
+            runId: typeof s.run_id === 'string' ? s.run_id : null, utcMs, ageS, stale,
+            state: typeof opts.state === 'string' ? opts.state : null, tsocMatch },
+          limits: lim,
+          sources, nodes, flows, sensors,
+          fan: { floor, rpm, share, gFanWK: gFan, gBaseWK: K.airBaseWK, gAirWK: gAir,
+            leftRpm: num(rpm[K.fanLeftSlowIdx]), rightRpm: num(rpm[K.fanRightFastIdx]) },
+          balance: { inW, outW, storeW, tolW, state: balState, neckW, airW, plateJ, finsJ, coolerJ, toSteadyJ,
+            plateSteadyC, finsSteadyC, dPlateK, dFinsK, ambientC, finsRateKs: storeW === null ? null : storeW / K.finsJK },
+          cpu: { totalW: cpuTotalW, source: cpuSource, scale, modelVersion: CPU_MODEL.version },
+          notes,
+        };
+      }
+
+      /* ---------- temperature colour scale: 30 blue -> 45 mint -> 60 amber -> 90+ red ---------- */
+      const TEMP_STOPS = [[30, [131, 168, 255]], [45, [87, 227, 195]], [60, [246, 199, 107]], [90, [255, 125, 120]]];
+      const NO_DATA = '#6b7a90', AMBER = '#f6c76b', HALO = '#101620';
+      function tempRgb(c) {
+        if (num(c) === null) return null;
+        if (c <= TEMP_STOPS[0][0]) return TEMP_STOPS[0][1];
+        for (let i = 1; i < TEMP_STOPS.length; i++) {
+          const [t1, c1] = TEMP_STOPS[i], [t0, c0] = TEMP_STOPS[i - 1];
+          if (c <= t1) { const k = (c - t0) / (t1 - t0); return c0.map((v, j) => Math.round(v + (c1[j] - v) * k)); }
+        }
+        return TEMP_STOPS[TEMP_STOPS.length - 1][1];
+      }
+      const hex = rgb => '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
+      function tempColor(c) { const rgb = tempRgb(c); return rgb ? hex(rgb) : NO_DATA; }
+      function tempFill(c, alpha = 0.17) {           // node fill: temperature colour over --surface
+        const base = [16, 22, 32], rgb = tempRgb(c) || [107, 122, 144];
+        return hex(base.map((v, i) => Math.round(v + (rgb[i] - v) * alpha)));
+      }
+
+      /* ---------- layout (viewBox units) ---------- */
+      const LAYOUT = Object.freeze({
+        W: 1280, H: 776,
+        src: { x: 16, w: 204 },
+        zone: { x: 292, w: 146 },          // GPU hotspot + CPU zones column
+        gnode: { x: 504, w: 144 },
+        pkg: { x: 278, y: 44, w: 380, h: 498 },
+        rows: {
+          gpu: { y: 60, h: 100 }, P0: { y: 176, h: 62 }, P1: { y: 250, h: 62 }, E0: { y: 324, h: 62 },
+          E1: { y: 398, h: 62 }, base: { y: 476, h: 42 }, other: { y: 568, h: 82 },
+        },
+        plate: { x: 700, y: 60, w: 134, h: 590 },           // (1) primary copper plate
+        neck: { y: 250, open: 26, waist: 6 },               // (2) neck between plate and fins
+        fins: { x: 884, y: 60, w: 170, h: 380 },            // (3) fin block
+        nic: { x: 884, y: 540, w: 170, h: 110 },            // (4) ConnectX NIC with heatpipe
+        airY: 250,
+        amb: { x: 1166, y: 198, w: 100, h: 106 },
+        fans: { titleX: 1068, titleY: 70, cy: 108, r: 20, left: 1112, right: 1218, noteY: 192 },
+        formula: { x: 1068, y: 342 },
+        caseBox: { x: 1066, y: 452, w: 200, h: 198 },
+        legendY: 702,
+        pxPerW: 0.32,                       // arrow stroke width per watt
+      });
+
+      /**
+       * render(state, mount) -> void. Draws the TwinState into `mount` as one inline SVG.
+       * Pure view: reads only the view model. All SVG ids are prefixed "tw-".
+       */
+      function render(state, mount) {
+        const L = LAYOUT, defs = [], g = [];
+        const F = Object.fromEntries(state.flows.map(f => [f.id, f]));
+        const S = Object.fromEntries(state.sensors.map(x => [x.id, x]));
+        const N = state.nodes, b = state.balance, lim = state.limits;
+        const cy = r => L.rows[r].y + L.rows[r].h / 2;
+        const tw = (text, px) => String(text).length * px * 0.53;  // rough text width for background pills
+        const txt = (cls, x, y, text, attrs = '') => `<text class="${cls}" x="${x}" y="${y}"${attrs}>${esc(text)}</text>`;
+
+        /* Heat-flow arrow: horizontal, width ∝ W, colour gradient from the upstream to the downstream temperature. */
+        const arrow = (f, x1, y, x2, fromC, toC, label) => {
+          if (!f) return;
+          const known = num(f.w) !== null;
+          const sw = known ? Math.max(1.5, f.w * L.pxPerW) : 1.5;
+          const head = Math.max(9, sw * 0.7 + 6), half = Math.max(5.5, sw / 2 + 4);
+          const xe = x2 - head, gid = `tw-g-${f.id}`;
+          const c0 = tempColor(num(fromC) ?? toC), c1 = tempColor(toC);
+          defs.push(`<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="0" x2="${x2}" y2="0"><stop offset="0" stop-color="${c0}"/><stop offset="1" stop-color="${c1}"/></linearGradient>`);
+          g.push(`<g><title>${esc(`${f.from} → ${f.to}: ${fmtW(f.w, f.kind)}${f.conductanceWK ? ` · ${fmt(f.conductanceWK, 2)} W/K` : ''}`)}</title>`
+            + `<line x1="${x1}" y1="${y}" x2="${xe}" y2="${y}" stroke="url(#${gid})" stroke-width="${sw.toFixed(1)}" stroke-opacity=".62"${known ? '' : ' stroke-dasharray="4 4"'}/>`
+            + `<polygon points="${xe},${y - half} ${x2},${y} ${xe},${y + half}" fill="${c1}" fill-opacity=".9"/></g>`);
+          if (label) {
+            const lx = label.x ?? (x1 + xe) / 2;
+            if (label.top !== false) g.push(`<text class="tw-flow" x="${lx}" y="${(y - sw / 2 - 6).toFixed(1)}" text-anchor="middle">${esc(fmtW(f.w, f.kind))}</text>`);
+            if (label.sub) g.push(`<text class="tw-flowsub" x="${lx}" y="${(y + sw / 2 + 15).toFixed(1)}" text-anchor="middle">${esc(label.sub)}</text>`);
+          }
+        };
+
+        /* Sensor pin: filled with its temperature colour, ring when above target or near the abort. */
+        const pin = (sensor, x, y) => {
+          if (!sensor) return '';
+          const col = tempColor(sensor.valueC);
+          const ring = sensor.level === 'abort' || sensor.level === 'near abort' ? '#ff7d78'
+            : sensor.level === 'above target' ? AMBER : null;
+          const tip = `${sensor.label} · ${sensor.desc}: ${sensor.valueC === null ? 'unavailable' : fmtC(sensor.valueC)}`
+            + (sensor.targetC !== null ? ` · target ≤ ${fmt(sensor.targetC, 0)} °C` : '')
+            + (sensor.abortC !== null ? ` · abort ${fmt(sensor.abortC, 0)} °C (${fmt(sensor.headroomK, 1)} K headroom)` : '');
+          return `<g><title>${esc(tip)}</title>`
+            + (ring ? `<circle cx="${x}" cy="${y}" r="11" fill="none" stroke="${ring}" stroke-width="1.8"/>` : '')
+            + `<circle cx="${x}" cy="${y}" r="6.5" fill="${col}" stroke="${HALO}" stroke-width="2.5"/>`
+            + `<circle cx="${x}" cy="${y}" r="2" fill="${HALO}"/></g>`;
+        };
+
+        /* Dashed pill tag ("estimated", "model estimate"). */
+        const pill = (x, y, text, color) => `<rect x="${x}" y="${y}" width="${(tw(text, 10.5) + 14).toFixed(0)}" height="18" rx="9" fill="none" stroke="${color}" stroke-dasharray="3 3"/>`
+          + `<text class="tw-sm" x="${(x + (tw(text, 10.5) + 14) / 2).toFixed(1)}" y="${y + 13}" text-anchor="middle">${esc(text)}</text>`;
+        const hr = (box, y) => `<line x1="${box.x + 10}" x2="${box.x + box.w - 10}" y1="${y}" y2="${y}" class="tw-line"/>`;
+        const row = (box, y, label, value, color) => txt('tw-sm', box.x + 10, y, label)
+          + `<text class="tw-val" x="${box.x + box.w - 10}" y="${y}" text-anchor="end"${color ? ` style="fill:${color}"` : ''}>${esc(value)}</text>`;
+
+        /* Storage node box with its sensor pin (top right) and reading. */
+        const nodeBox = (n, x, y, w, h, details) => {
+          const col = tempColor(n.tempC), dashed = n.kind !== 'measured';
+          const sensor = n.sensor ? S[n.sensor] : null;
+          const twin = num(n.twinC) !== null ? ` · twin ${fmtC(r1(n.twinC))} (${signed(n.residualK)} K)` : '';
+          let out = `<g><title>${esc(`${n.label}: ${fmtC(n.tempC)}${n.capacityJK ? ` · C = ${n.capacityJK} J/K` : ''}${twin}`)}</title>`
+            + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${tempFill(n.tempC)}" stroke="${col}" stroke-width="1.6"${dashed ? ' stroke-dasharray="6 4"' : ''}/></g>`
+            + txt('tw-title', x + 10, y + 18, n.label)
+            + `<text class="tw-big" x="${x + 10}" y="${y + 41}" fill="${col}">${esc(fmtC(n.tempC))}</text>`;
+          if (sensor) {
+            out += pin(sensor, x + w - 14, y + 13) + `<text class="tw-mono" x="${x + w - 10}" y="${y + 40}" text-anchor="end">${esc(sensor.label)}</text>`;
+          }
+          details.forEach((line, i) => { out += txt('tw-sm', x + 10, y + 57 + i * 15, line); });
+          g.push(out);
+        };
+
+        /* Heat source box: amber accent bar; dashed when the power is estimated or assumed. */
+        const sourceBox = (src, rowId) => {
+          const { x, w } = L.src, { y, h } = L.rows[rowId];
+          const dashed = src.kind !== 'measured';
+          const tag = src.kind === 'measured' ? 'measured' : src.kind === 'assumed' ? '(assumed)' : src.kind === 'fitted' ? '(fitted)' : '(estimated)';
+          let out = `<rect class="tw-src" x="${x}" y="${y}" width="${w}" height="${h}" rx="10"${dashed ? ' stroke-dasharray="6 4"' : ''}/>`
+            + `<rect class="tw-accent" x="${x}" y="${y + 8}" width="4" height="${h - 16}" rx="2"/>`
+            + `<text class="tw-title" x="${x + 14}" y="${y + 18}">${esc(src.label)}${src.sub ? `<tspan class="tw-sub" dx="6">${esc(src.sub)}</tspan>` : ''}</text>`;
+          if (rowId === 'base') {
+            out += `<text class="tw-val" x="${x + 14}" y="${y + 34}" style="fill:${AMBER}">${esc(fmtW(src.powerW, src.kind))}<tspan class="tw-sub" dx="6">${tag}</tspan></text>`;
+          } else {
+            out += `<text class="tw-big" x="${x + 14}" y="${y + 42}" fill="${AMBER}">${esc(fmtW(src.powerW, src.kind))}<tspan class="tw-sub" dx="7">${tag}</tspan></text>`;
+            src.lines.forEach((line, i) => { out += txt('tw-sm', x + 14, y + 58 + i * 16, line); });
+          }
+          g.push(out);
+        };
+
+        /* ---- column headers ---- */
+        g.push(txt('tw-head', L.src.x, 26, 'HEAT SOURCES') + txt('tw-head', L.zone.x, 26, 'HEAT STORES · SOC')
+          + txt('tw-head', L.plate.x, 26, 'COOLER · 3 PARTS') + txt('tw-head', L.fans.titleX, 26, 'HEAT REMOVAL'));
+
+        /* ---- SoC package boundary (TSOC sits on it) ---- */
+        const Pk = L.pkg;
+        g.push(`<rect x="${Pk.x}" y="${Pk.y}" width="${Pk.w}" height="${Pk.h}" rx="16" fill="none" class="tw-line" stroke-width="1.2" stroke-dasharray="3 5"/>`
+          + `<rect class="tw-bgpill" x="${Pk.x + 12}" y="${Pk.y - 8}" width="${(tw('SOC-PACKAGE GB10', 10.5) + 10).toFixed(0)}" height="16" rx="4"/>`
+          + txt('tw-pkg', Pk.x + 17, Pk.y + 4, 'SOC-PACKAGE GB10'));
+
+        /* ---- flows first (under the boxes' edges) ---- */
+        const P = L.plate, Fb = L.fins, Nc = L.nic, gRow = cy('gpu');
+        const fitIdx = K.fitLabel.indexOf(' ('), fitA = fitIdx < 0 ? K.fitLabel : K.fitLabel.slice(0, fitIdx), fitB = fitIdx < 0 ? '' : K.fitLabel.slice(fitIdx + 1);
+        arrow(F['src-gpu'], L.src.x + L.src.w, gRow, L.zone.x, N.die.tgpuC, N.die.tgpuC, null);
+        arrow(F['die-plate'], L.gnode.x + L.gnode.w, gRow, P.x, N.die.tgpuC, N.plate.tempC,
+          { sub: `${fmt(K.hotspotKW, 2)} K/W` });
+        for (const c of DISPLAY_CLUSTERS) {
+          const y = cy(c), zn = N['z' + c];
+          arrow(F[`src-${c}`], L.src.x + L.src.w, y, L.zone.x, zn.tempC, zn.tempC, null);
+          arrow(F[`z${c}-plate`], L.zone.x + L.zone.w, y, P.x, zn.tempC, N.plate.tempC, { x: 552 });
+        }
+        arrow(F['base-plate'], L.src.x + L.src.w, cy('base'), P.x, S.TUNC && S.TUNC.valueC, N.plate.tempC, { x: 552 });
+        arrow(F['other-plate'], L.src.x + L.src.w, cy('other'), P.x, null, N.plate.tempC, { x: 552 });
+        arrow(F['fins-air'], Fb.x + Fb.w, L.airY, L.amb.x, N.fins.tempC, N.ambient.tempC,
+          { sub: `G ${fmt(state.fan.gAirWK, 2)} W/K` });
+
+        /* ---- sources ---- */
+        const srcById = Object.fromEntries(state.sources.map(x => [x.id, x]));
+        ['gpu', ...DISPLAY_CLUSTERS, 'base', 'other'].forEach(id => sourceBox(srcById[id], id));
+
+        /* ---- GPU die: TGPU and nvidia measure the die, which the fit lumps into the fast store ---- */
+        const G = L.rows.gpu, D = N.die, dx = L.zone.x, dw = L.gnode.x + L.gnode.w - L.zone.x, half = dw / 2;
+        const tCol = tempColor(D.tgpuC), nCol = tempColor(D.nvidiaC);
+        g.push(`<g><title>${esc(`GPU die: TGPU ${fmtC(D.tgpuC)} and nvidia ${fmtC(D.nvidiaC)} measure the die. The fit lumps die and contact plate into the fast store (${K.plateJK} J/K): TGPU = plate + ${fmt(K.hotspotKW, 2)} K/W × P_GPU (${K.fitLabel}). nvidia − P/${fmt(K.gnodeWK, 1)} is the cross-check from the older two-node model.`)}</title>`
+          + `<rect x="${dx}" y="${G.y}" width="${dw}" height="${G.h}" rx="10" fill="${tempFill(D.tgpuC)}" stroke="${tCol}" stroke-width="1.6"/></g>`
+          + `<line x1="${dx + half}" x2="${dx + half}" y1="${G.y + 8}" y2="${G.y + G.h - 8}" class="tw-line" stroke-dasharray="3 3"/>`
+          + txt('tw-title', dx + 10, G.y + 18, 'GPU hotspot')
+          + pin(S.TGPU, dx + half - 14, G.y + 13) + `<text class="tw-mono" x="${dx + half - 10}" y="${G.y + 40}" text-anchor="end">TGPU</text>`
+          + `<text class="tw-big" x="${dx + 10}" y="${G.y + 41}" fill="${tCol}">${esc(fmtC(D.tgpuC))}</text>`
+          + txt('tw-sm', dx + 10, G.y + 57, `= plate + ${fmt(K.hotspotKW, 2)} K/W × P`)
+          + txt('tw-fit', dx + 10, G.y + 72, `${K.fitShort} ${fitB}`)
+          + txt('tw-sm', dx + 10, G.y + 87, `target ≤ ${fmt(D.tgpuSetpointC, 0)} °C (zone)`)
+          + txt('tw-title', dx + half + 10, G.y + 18, 'GPU sensor')
+          + pin(S.nvidia, dx + dw - 14, G.y + 13) + `<text class="tw-mono" x="${dx + dw - 10}" y="${G.y + 40}" text-anchor="end">nvidia</text>`
+          + `<text class="tw-big" x="${dx + half + 10}" y="${G.y + 41}" fill="${nCol}">${esc(fmtC(D.nvidiaC))}</text>`
+          + txt('tw-sm', dx + half + 10, G.y + 57, `cross-check − P/${fmt(K.gnodeWK, 1)}:`)
+          + txt('tw-sm', dx + half + 10, G.y + 72, `plate ≈ ${fmtC(r1(D.plateFromNvidia))}${D.crossK === null ? '' : ` (${signed(D.crossK)} K)`}`)
+          + txt('tw-sm', dx + half + 10, G.y + 87, `target ${fmt(D.nvidiaTargetC, 0)} · abort ${fmt(D.nvidiaAbortC, 0)} °C`));
+        for (const c of DISPLAY_CLUSTERS) {
+          const r = L.rows[c], zn = N['z' + c];
+          nodeBox(zn, L.zone.x, r.y, L.zone.w, r.h, [`τ ↑${fmt(zn.lag.upS, 1)}/↓${fmt(zn.lag.downS, 0)} s · ≤ ${fmt(zn.setpointC, 0)} °C`]);
+        }
+        // TUNC sits on the uncore path inside the package.
+        const tx = L.zone.x + 18, ty = cy('base');
+        g.push(pin(S.TUNC, tx, ty)
+          + `<text class="tw-sm" x="${tx + 14}" y="${ty - 7}">TUNC · uncore <tspan style="fill:${tempColor(S.TUNC.valueC)};font-weight:700">${esc(fmtC(S.TUNC.valueC))}</tspan></text>`);
+        // TSOC sits on the package boundary: firmware maximum of the SoC zones.
+        const sx = Pk.x + 22, sy = Pk.y + Pk.h;
+        const tsocText = `TSOC ${fmtC(S.TSOC.valueC)} · SoC maximum${state.meta.tsocMatch ? ` (= ${state.meta.tsocMatch})` : ''}`;
+        g.push(`<rect class="tw-bgpill" x="${sx - 12}" y="${sy - 9}" width="${(tw(tsocText, 10.5) + 26).toFixed(0)}" height="18" rx="4"/>`
+          + pin(S.TSOC, sx, sy) + `<text class="tw-sm" x="${sx + 13}" y="${sy + 4}" style="fill:#f3f7fc">${esc(tsocText)}</text>`);
+
+        /* ---- (1) die + primary copper plate: fast store, estimated temperature; balance of the whole cooler ---- */
+        const pCol = tempColor(N.plate.tempC), px = P.x + 10;
+        const pBasis = N.plate.source === 'nvidia' ? `nvidia − P/${fmt(K.gnodeWK, 1)}` : `TGPU − ${fmt(K.hotspotKW, 2)}·P`;
+        const balCol = b.state === 'charging' ? AMBER : b.state === 'discharging' ? '#83a8ff' : b.state === 'unknown' ? '#a2afc0' : '#57e3c3';
+        g.push(`<g><title>${esc(`Die + primary contact plate (fast store; the die carries the GPU and the CPU clusters) ≈ ${fmtC(r1(N.plate.tempC))}, estimated: ${pBasis}. C = ${K.plateJK} J/K, ${K.fitLabel} · E = C × (T − T_room)`)}</title>`
+          + `<rect x="${P.x}" y="${P.y}" width="${P.w}" height="${P.h}" rx="12" fill="${tempFill(N.plate.tempC, 0.2)}" stroke="${pCol}" stroke-width="1.8" stroke-dasharray="7 4"/></g>`
+          + txt('tw-title', px, P.y + 18, 'Die +') + txt('tw-title', px, P.y + 33, 'contact plate')
+          + txt('tw-sm', px, P.y + 48, 'fast store')
+          + `<text class="tw-big" x="${px}" y="${P.y + 76}" fill="${pCol}">${esc('≈ ' + fmtC(r1(N.plate.tempC)))}</text>`
+          + pill(px, P.y + 86, 'estimated', pCol)
+          + txt('tw-sm', px, P.y + 122, pBasis)
+          + hr(P, P.y + 134)
+          + txt('tw-sm', px, P.y + 150, `C ${K.plateJK} J/K · τ ≈ ${fmt(N.plate.tauS, 0)} s`)
+          + txt('tw-sm', px, P.y + 164, `≈ ${fmt(N.plate.massG, 0)} g Cu equiv.`)
+          + txt('tw-fit', px, P.y + 178, fitA) + txt('tw-fit', px, P.y + 191, fitB)
+          + hr(P, P.y + 202)
+          + txt('tw-pkg', px, P.y + 218, 'ENERGY')
+          + `<text class="tw-big" x="${px}" y="${P.y + 244}" fill="${pCol}">${esc(fmtWh(b.plateJ))}</text>`
+          + txt('tw-sm', px, P.y + 262, `${fmtKJ(b.plateJ, 2)} above room`));
+        const by = P.y + 300;
+        g.push(hr(P, by - 14) + txt('tw-pkg', px, by, 'COOLER BALANCE')
+          + row(P, by + 18, 'In', `${fmt(b.inW, 1)} W`)
+          + row(P, by + 36, 'Out', `${fmt(b.outW, 1)} W`)
+          + row(P, by + 54, 'Charge Σ', `${signed(b.storeW)} W`, balCol)
+          + `<text class="tw-val" x="${px}" y="${by + 76}" style="fill:${balCol}">${esc(b.state)}</text>`
+          + txt('tw-sm', px, by + 92, `fins ${signed(b.finsRateKs === null ? null : b.finsRateKs * 60, 2)} K/min`)
+          + hr(P, by + 106) + txt('tw-pkg', px, by + 122, 'STEADY STATE')
+          + txt('tw-sm', px, by + 140, `plate → ${fmtC(r1(b.plateSteadyC))}`)
+          + txt('tw-sm', px, by + 154, `fins → ${fmtC(r1(b.finsSteadyC))}`)
+          + txt('tw-sm', px, by + 172, `to go ${signed(b.toSteadyJ === null ? null : b.toSteadyJ / 1000, 1)} kJ`));
+
+        /* ---- (2) neck: narrow cross-section between plate and fin block (thermal bottleneck) ---- */
+        const fCol = tempColor(N.fins.tempC), nx1 = P.x + P.w, nx2 = Fb.x, ny = L.neck.y, o = L.neck.open, w = L.neck.waist;
+        const m1 = nx1 + (nx2 - nx1) * 0.36, m2 = nx1 + (nx2 - nx1) * 0.64, nmx = (nx1 + nx2) / 2;
+        defs.push(`<linearGradient id="tw-g-neckfill" gradientUnits="userSpaceOnUse" x1="${nx1}" y1="0" x2="${nx2}" y2="0"><stop offset="0" stop-color="${pCol}"/><stop offset="1" stop-color="${fCol}"/></linearGradient>`);
+        g.push(`<g><title>${esc(`Neck, contact plate → fin block: G = ${fmt(K.neckWK, 2)} W/K (${K.fitLabel}) · Q ≈ ${fmtW(b.neckW, 'estimated')}`)}</title>`
+          + `<polygon points="${nx1},${ny - o} ${m1},${ny - w} ${m2},${ny - w} ${nx2},${ny - o} ${nx2},${ny + o} ${m2},${ny + w} ${m1},${ny + w} ${nx1},${ny + o}" fill="url(#tw-g-neckfill)" fill-opacity=".5" stroke="url(#tw-g-neckfill)" stroke-width="1.3"/>`
+          + `<polygon points="${m2 - 4},${ny - 4} ${m2 + 3},${ny} ${m2 - 4},${ny + 4}" fill="${fCol}"/></g>`
+          + `<text class="tw-flowsub" x="${nmx}" y="${ny - o - 8}" text-anchor="middle">Neck</text>`
+          + `<text class="tw-flow" x="${nmx}" y="${ny + o + 16}" text-anchor="middle">${esc(fmtW(b.neckW, 'estimated'))}</text>`
+          + `<text class="tw-flowsub" x="${nmx}" y="${ny + o + 30}" text-anchor="middle">${esc(`${fmt(K.neckWK, 2)} W/K`)}</text>`
+          + `<text class="tw-fit" x="${nmx}" y="${ny + o + 44}" text-anchor="middle">${esc(K.fitShort)}</text>`);
+
+        /* ---- (3) fin block + case air: main store, model estimate (no sensor), fitted capacity ---- */
+        const fx = Fb.x + 10;
+        let comb = '';
+        for (let y = Fb.y + 14; y <= Fb.y + Fb.h - 12; y += 7) comb += `M${Fb.x + Fb.w - 22} ${y}H${Fb.x + Fb.w - 5}`;
+        g.push(`<g><title>${esc(`Fin block + case air (main store) ≈ ${fmtC(r1(N.fins.tempC))}, model estimate without a sensor: T_plate − P_in / ${fmt(K.neckWK, 2)} W/K (plate quasi-steady, τ ≈ ${fmt(N.plate.tauS, 0)} s). C = ${K.finsJK} J/K, ${K.fitLabel}`)}</title>`
+          + `<rect x="${Fb.x}" y="${Fb.y}" width="${Fb.w}" height="${Fb.h}" rx="12" fill="${tempFill(N.fins.tempC, 0.16)}" stroke="${fCol}" stroke-width="1.8" stroke-dasharray="7 4"/>`
+          + `<path d="${comb}" stroke="${fCol}" stroke-opacity=".38" stroke-width="1.6"/></g>`
+          + txt('tw-title', fx, Fb.y + 18, 'Fin block')
+          + txt('tw-sm', fx, Fb.y + 33, '+ case air (main store)')
+          + `<text class="tw-big" x="${fx}" y="${Fb.y + 61}" fill="${fCol}">${esc('≈ ' + fmtC(r1(N.fins.tempC)))}</text>`
+          + pill(fx, Fb.y + 71, 'model estimate', fCol)
+          + txt('tw-sm', fx, Fb.y + 106, 'no sensor: plate')
+          + txt('tw-sm', fx, Fb.y + 120, `− P_in / ${fmt(K.neckWK, 2)} W/K`)
+          + hr({ x: Fb.x, w: Fb.w - 22 }, Fb.y + 132)
+          + txt('tw-sm', fx, Fb.y + 148, `C ${K.finsJK} J/K · τ ≈ ${fmt(N.fins.tauS, 0)} s`)
+          + txt('tw-sm', fx, Fb.y + 162, `≈ ${fmt(N.fins.massG, 0)} g Al equiv.`)
+          + txt('tw-fit', fx, Fb.y + 176, fitA) + txt('tw-fit', fx, Fb.y + 189, fitB)
+          + hr({ x: Fb.x, w: Fb.w - 22 }, Fb.y + 202)
+          + txt('tw-pkg', fx, Fb.y + 218, 'ENERGY')
+          + `<text class="tw-big" x="${fx}" y="${Fb.y + 244}" fill="${fCol}">${esc(fmtWh(b.finsJ))}</text>`
+          + txt('tw-sm', fx, Fb.y + 262, `${fmtKJ(b.finsJ)} above room`)
+          + hr({ x: Fb.x, w: Fb.w - 22 }, Fb.y + 276)
+          + txt('tw-sm', fx, Fb.y + 292, `charge ${signed(b.storeW)} W`)
+          + txt('tw-sm', fx, Fb.y + 306, `${signed(b.finsRateKs === null ? null : b.finsRateKs * 60, 2)} K/min`)
+          + txt('tw-sm', fx, Fb.y + 322, `→ room ${fmt(state.fan.gAirWK, 2)} W/K`)
+          + txt('tw-fit', fx, Fb.y + 336, `${K.fitShort} (floor 2–12)`));
+
+        /* ---- (4) ConnectX NIC: own copper plate, heatpipe into the fin block; power unknown ---- */
+        const hx = Nc.x + Nc.w / 2, hy1 = Nc.y - 6, hy2 = Fb.y + Fb.h;
+        g.push(`<g><title>${esc(`Heatpipe, NIC copper plate → fin block · power unknown, included in the fitted background heat ~${fmt(K.backgroundW, 1)} W`)}</title>`
+          + `<line x1="${hx}" y1="${hy1}" x2="${hx}" y2="${hy2 + 2}" stroke="${NO_DATA}" stroke-width="10" stroke-linecap="round" stroke-opacity=".45"/>`
+          + `<line x1="${hx}" y1="${hy1 - 2}" x2="${hx}" y2="${hy2 + 14}" stroke="#a2afc0" stroke-width="1.5" stroke-dasharray="4 4"/>`
+          + `<polygon points="${hx - 5},${hy2 + 15} ${hx},${hy2 + 5} ${hx + 5},${hy2 + 15}" fill="#a2afc0"/></g>`
+          + txt('tw-sm', hx + 12, (hy1 + hy2) / 2 - 2, 'heatpipe')
+          + txt('tw-sm', hx + 12, (hy1 + hy2) / 2 + 12, 'P unknown')
+          + `<rect x="${Nc.x}" y="${Nc.y}" width="${Nc.w}" height="${Nc.h}" rx="10" fill="${tempFill(null, 0.1)}" stroke="#a2afc0" stroke-width="1.3" stroke-dasharray="6 4"/>`
+          + `<rect x="${Nc.x + 45}" y="${Nc.y - 7}" width="${Nc.w - 90}" height="10" rx="3" fill="${NO_DATA}" fill-opacity=".55" stroke="#a2afc0" stroke-width="1"/>`
+          + txt('tw-title', Nc.x + 10, Nc.y + 26, 'ConnectX NIC')
+          + txt('tw-sm', Nc.x + 10, Nc.y + 42, 'own copper plate')
+          + txt('tw-sm', Nc.x + 10, Nc.y + 64, 'P unknown, included in')
+          + txt('tw-sm', Nc.x + 10, Nc.y + 78, `background heat ~${fmt(K.backgroundW, 1)} W`)
+          + txt('tw-sm', Nc.x + 10, Nc.y + 96, 'no sensor'));
+
+        /* ---- fans: right = fast (CPU/GPU side, rpm[1]), left = slow (NIC side, rpm[0]); from the RPM ---- */
+        const Fa = L.fans;
+        g.push(`<text class="tw-title" x="${Fa.titleX}" y="${Fa.titleY}">Fans <tspan class="tw-sub" dx="6">Floor ${esc(fmt(state.fan.floor, 0))} / 12</tspan></text>`);
+        [[Fa.left, state.fan.leftRpm, 'left · NIC side', `slow · rpm[${K.fanLeftSlowIdx}]`],
+         [Fa.right, state.fan.rightRpm, 'right · CPU/GPU', `fast · rpm[${K.fanRightFastIdx}]`]].forEach(([cx, rpmV, where, speed]) => {
+          const r = Fa.r, cyF = Fa.cy;
+          let fanSvg = `<g><title>${esc(`Fan ${where}: ${fmt(rpmV, 0)} rpm (${speed}; mapping from the RPM)`)}</title><circle class="tw-fan" cx="${cx}" cy="${cyF}" r="${r}"/>`;
+          for (let k = 0; k < 4; k++) {
+            fanSvg += `<ellipse cx="${cx}" cy="${cyF - r * 0.45}" rx="${(r * 0.2).toFixed(1)}" ry="${(r * 0.42).toFixed(1)}" transform="rotate(${k * 90 + 25} ${cx} ${cyF})" fill="#83a8ff" fill-opacity=".55"/>`;
+          }
+          fanSvg += `<circle cx="${cx}" cy="${cyF}" r="${(r * 0.17).toFixed(1)}" fill="#a2afc0"/></g>`
+            + `<text class="tw-val" x="${cx}" y="${cyF + r + 17}" text-anchor="middle">${esc(fmt(rpmV, 0))}<tspan class="tw-sub" dx="3">rpm</tspan></text>`
+            + txt('tw-sm', cx, cyF + r + 31, where, ' text-anchor="middle"')
+            + txt('tw-sm', cx, cyF + r + 44, speed, ' text-anchor="middle"');
+          g.push(fanSvg);
+        });
+        g.push(txt('tw-sm', Fa.titleX, Fa.noteY, 'mapping from the RPM'));
+
+        /* ---- ambient air ---- */
+        const A = L.amb, aCol = tempColor(N.ambient.tempC), ax = A.x + A.w / 2;
+        g.push(`<rect x="${A.x}" y="${A.y}" width="${A.w}" height="${A.h}" rx="12" fill="${tempFill(N.ambient.tempC, 0.14)}" stroke="${aCol}" stroke-width="1.6" stroke-dasharray="6 4"/>`
+          + txt('tw-title', ax, A.y + 22, 'Room air', ' text-anchor="middle"') + txt('tw-sm', ax, A.y + 37, '(intake)', ' text-anchor="middle"')
+          + `<text class="tw-big" x="${ax}" y="${A.y + 66}" text-anchor="middle" fill="${aCol}">${esc(fmtC(N.ambient.tempC))}</text>`
+          + txt('tw-sm', ax, A.y + 84, `${K.ambientNote},`, ' text-anchor="middle"') + txt('tw-sm', ax, A.y + 97, 'no live sensor', ' text-anchor="middle"'));
+
+        /* ---- disposal formula: Q = (T_fins − T_air) × G ---- */
+        const Q = L.formula;
+        g.push(txt('tw-pkg', Q.x, Q.y, 'REMOVAL  Q = ΔT × G')
+          + txt('tw-sm', Q.x, Q.y + 18, `ΔT = ${fmt(N.fins.tempC, 1)} − ${fmt(N.ambient.tempC, 1)} = ${fmt(b.dFinsK, 1)} K`)
+          + txt('tw-sm', Q.x, Q.y + 34, `G = ${fmt(K.airBaseWK, 2)} + ${fmt(K.airFanWK, 2)} × ${fmt(state.fan.share, 2)} = ${fmt(state.fan.gAirWK, 2)} W/K`)
+          + `<text class="tw-val" x="${Q.x}" y="${Q.y + 54}">Q ≈ ${esc(fmt(b.outW, 1))} W</text>`
+          + txt('tw-sm', Q.x, Q.y + 72, `sources Σ ${fmt(b.inW, 1)} W · Δ ${signed(b.storeW)} W`)
+          + txt('tw-fit', Q.x, Q.y + 88, `G ${K.fitLabel}`));
+
+        /* ---- case interior: Wi-Fi and NVMe see only case air and radiation, not the cooler ---- */
+        const Cb = L.caseBox, cx0 = Cb.x + 10;
+        g.push(`<rect x="${Cb.x}" y="${Cb.y}" width="${Cb.w}" height="${Cb.h}" rx="12" fill="none" stroke="#a2afc0" stroke-opacity=".7" stroke-width="1.2" stroke-dasharray="2 4"/>`
+          + txt('tw-title', cx0, Cb.y + 20, 'Case interior')
+          + txt('tw-sm', cx0, Cb.y + 36, 'air + radiation, not on the cooler'));
+        [['wifi', Cb.y + 64], ['nvme', Cb.y + 90]].forEach(([id, y]) => {
+          const sn = S[id], x = cx0 + 8;
+          g.push(pin(sn, x, y) + `<text class="tw-sm" x="${x + 14}" y="${y + 4}">${esc(sn.label)} <tspan style="fill:${tempColor(sn.valueC)};font-weight:700">${esc(sn.valueC === null ? 'unavailable' : fmtC(sn.valueC))}</tspan></text>`);
+        });
+        g.push(txt('tw-sm', cx0, Cb.y + 118, 'measured (energy_control, board_c)')
+          + txt('tw-sm', cx0, Cb.y + 132, 'reference, not in the control loop')
+          + txt('tw-sm', cx0, Cb.y + 154, `warms under load: Wi-Fi`)
+          + txt('tw-sm', cx0, Cb.y + 168, `≈ +${fmt(K.caseWifiRiseK, 0)} K at ≈ +${fmt(K.caseWifiRiseAtW, 0)} W`));
+
+        /* ---- legend: colour scale with targets and aborts, plus encodings ---- */
+        const ly = L.legendY, bx = 110, bw = 500, t0 = 25, t1 = 100;
+        const xs = t => bx + (clamp(t, t0, t1) - t0) / (t1 - t0) * bw;
+        defs.push(`<linearGradient id="tw-scale" x1="0" x2="1" y1="0" y2="0">${
+          TEMP_STOPS.map(([t, rgb]) => `<stop offset="${((t - t0) / (t1 - t0)).toFixed(3)}" stop-color="${hex(rgb)}"/>`).join('')}</linearGradient>`);
+        let lg = `<line x1="16" x2="${L.W - 16}" y1="${ly - 18}" y2="${ly - 18}" class="tw-line"/>`
+          + txt('tw-pkg', 16, ly + 20, 'TEMPERATURE')
+          + `<rect x="${bx}" y="${ly + 11}" width="${bw}" height="10" rx="3" fill="url(#tw-scale)"/>`;
+        for (let t = 30; t <= 100; t += 10) {
+          lg += `<line x1="${xs(t)}" x2="${xs(t)}" y1="${ly + 21}" y2="${ly + 26}" class="tw-line" stroke-width="1.2"/>`
+            + txt('tw-sm', xs(t), ly + 38, String(t), ' text-anchor="middle"');
+        }
+        const marks = [
+          [lim.gpuTargetC, '#57e3c3'], [lim.cpuCeilingC, '#57e3c3'], [lim.gpuAbortC, '#ff7d78'], [lim.acpiAbortC, '#ff7d78'],
+        ].filter(m => num(m[0]) !== null);
+        marks.forEach(([t, color]) => {
+          const x = xs(t);
+          lg += `<polygon points="${x - 5},${ly - 1} ${x + 5},${ly - 1} ${x},${ly + 8}" fill="${color}"/>`
+            + `<text x="${x}" y="${ly - 5}" text-anchor="middle" style="font-size:10.5px;font-weight:700;fill:${color}">${esc(fmt(t, 0))}</text>`;
+        });
+        lg += `<text class="tw-sm" x="${bx}" y="${ly + 60}"><tspan style="fill:#57e3c3">▼ Target:</tspan> GPU ${esc(fmt(lim.gpuTargetC, 0))} °C (nvidia) · CPU zones ≤ ${esc(fmt(lim.cpuCeilingC, 0))} °C · TGPU ≤ ${esc(fmt(lim.gpuZoneSetpointC, 0))} °C`
+          + `<tspan dx="14" style="fill:#ff7d78">▼ Abort:</tspan> GPU ${esc(fmt(lim.gpuAbortC, 0))} °C (nvidia) · ACPI ${esc(fmt(lim.acpiAbortC, 0))} °C (all zones)</text>`;
+        const ex = 700;
+        lg += `<circle cx="${ex + 6}" cy="${ly + 14}" r="6.5" fill="${AMBER}" stroke="${HALO}" stroke-width="2.5"/><circle cx="${ex + 6}" cy="${ly + 14}" r="2" fill="${HALO}"/>`
+          + txt('tw-sm', ex + 20, ly + 18, 'sensor (ring: above target / near abort)')
+          + `<rect x="${ex}" y="${ly + 28}" width="14" height="12" rx="3" fill="none" stroke="#a2afc0" stroke-dasharray="3 2"/>`
+          + txt('tw-sm', ex + 20, ly + 38, 'dashed = estimated / model / assumed (~, ≈)')
+          + `<line x1="${ex + 300}" x2="${ex + 338}" y1="${ly + 14}" y2="${ly + 14}" stroke="${AMBER}" stroke-opacity=".62" stroke-width="${(10 * L.pxPerW).toFixed(1)}"/>`
+          + `<polygon points="${ex + 338},${ly + 8.5} ${ex + 347},${ly + 14} ${ex + 338},${ly + 19.5}" fill="${AMBER}"/>`
+          + txt('tw-sm', ex + 354, ly + 18, 'heat flow, width ∝ W (10 W)')
+          + txt('tw-sm', ex + 300, ly + 38, 'node colour = temperature')
+          + txt('tw-fit', ex + 300, ly + 56, `${K.fitLabel}: sink_fit.py`);
+        g.push(lg);
+
+        const aria = `Heat path: sources ${fmt(b.inW, 1)} W (GPU ${fmt(F['src-gpu'].w, 1)} W measured, CPU ~${fmt(state.cpu.totalW, 1)} W estimated, background heat ~${fmt(K.backgroundW, 1)} W fitted) flow into the die and contact plate at about ${fmtC(r1(N.plate.tempC))}, through the neck into the fin block and case air at about ${fmtC(r1(N.fins.tempC))} (model); removal to the room air (${fmtC(N.ambient.tempC)}) ${fmt(b.outW, 1)} W. Stored: plate ${fmtWh(b.plateJ)}, fin block ${fmtWh(b.finsJ)}.`;
+        mount.innerHTML = `<svg class="tw-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${L.W} ${L.H}" role="img" aria-label="${esc(aria)}" font-family="'Ubuntu Sans', Inter, ui-sans-serif, system-ui, sans-serif">`
+          + `<defs>${defs.join('')}</defs>${g.join('')}</svg>`;
+      }
+
+      /* KPI tiles below the diagram (readable on a phone). Pure view of the same TwinState. */
+      function renderSummary(state, el) {
+        const b = state.balance, f = state.fan, N = state.nodes, src = Object.fromEntries(state.sources.map(x => [x.id, x]));
+        const S = Object.fromEntries(state.sensors.map(x => [x.id, x]));
+        const guarded = state.sensors.filter(x => x.headroomK !== null);
+        const tight = guarded.length ? guarded.reduce((a, x) => (x.headroomK < a.headroomK ? x : a)) : null;
+        const over = state.sensors.filter(x => x.level === 'above target' || x.level === 'near abort' || x.level === 'abort');
+        const tile = (label, value, foot, color) => `<div class="kpi"><div class="kpi-label">${esc(label)}</div>`
+          + `<div class="kpi-value"${color ? ` style="color:${color}"` : ''}>${esc(value)}</div><div class="kpi-foot">${esc(foot)}</div></div>`;
+        const balCol = b.state === 'charging' ? 'var(--amber)' : b.state === 'discharging' ? 'var(--blue)' : b.state === 'unknown' ? null : 'var(--mint)';
+        const caseVal = S.wifi.valueC !== null ? `Wi-Fi ${fmtC(S.wifi.valueC)}` : S.nvme.valueC !== null ? `NVMe ${fmtC(S.nvme.valueC)}` : '—';
+        el.innerHTML = [
+          tile('Sources Σ', `${fmt(b.inW, 1)} W`,
+            `GPU ${fmt(src.gpu.powerW, 1)} W measured · CPU ~${fmt(state.cpu.totalW, 1)} W estimated · background ~${fmt(src.other.powerW, 1)} W fitted`),
+          tile('Removal to room air', `~${fmt(b.outW, 1)} W`,
+            `ΔT fin block ${fmt(b.dFinsK, 1)} K above ${fmtC(b.ambientC)} × G ${fmt(f.gAirWK, 2)} W/K · ${K.fitLabel}`),
+          tile('Die + contact plate (store)', fmtWh(b.plateJ),
+            `${fmtKJ(b.plateJ, 2)} above room · ≈ ${fmtC(r1(N.plate.tempC))} estimated · C ${K.plateJK} J/K ≈ ${fmt(N.plate.massG, 0)} g Cu · τ ≈ ${fmt(N.plate.tauS, 0)} s · ${K.fitLabel}`),
+          tile('Fin block + case air (store)', fmtWh(b.finsJ),
+            `${fmtKJ(b.finsJ)} above room · ≈ ${fmtC(r1(N.fins.tempC))} model estimate · C ${K.finsJK} J/K ≈ ${fmt(N.fins.massG, 0)} g Al · τ ≈ ${fmt(N.fins.tauS, 0)} s · ${K.fitLabel}`),
+          tile('Cooler Σ ' + b.state, `${signed(b.storeW)} W`,
+            `charge rate, goes into the fin block (${signed(b.finsRateKs === null ? null : b.finsRateKs * 60, 2)} K/min; plate quasi-steady) · ${signed(b.toSteadyJ === null ? null : b.toSteadyJ / 1000, 1)} kJ to steady state · plate → ${fmtC(r1(b.plateSteadyC))}`, balCol),
+          tile('Tightest margin', tight ? `${fmt(tight.headroomK, 1)} K` : '—',
+            tight ? `${tight.label} ${fmtC(tight.valueC)} to abort ${fmt(tight.abortC, 0)} °C${over.length ? ` · above target: ${over.map(x => x.label).join(', ')}` : ''}` : 'no sensor values',
+            tight && tight.headroomK < 3 ? 'var(--red)' : tight && tight.headroomK < 10 ? 'var(--amber)' : null),
+          tile('Fans', `floor ${fmt(f.floor, 0)}/12`,
+            `right (CPU/GPU, fast) ${fmt(f.rightRpm, 0)} · left (NIC, slow) ${fmt(f.leftRpm, 0)} rpm · mapping from the RPM`),
+          tile('Case interior', caseVal,
+            `NVMe ${S.nvme.valueC === null ? 'unavailable' : fmtC(S.nvme.valueC)} · Wi-Fi ${S.wifi.valueC === null ? 'unavailable' : fmtC(S.wifi.valueC)} · measured, not on the cooler`),
+        ].join('');
+      }
+
+      function renderMeta(state, el, fetchError) {
+        const m = state.meta;
+        const modeCls = ['RUN', 'RAMP', 'HOLD'].includes(m.mode) ? 'ok' : m.mode === 'SAFE_STATE' ? 'bad' : 'warn';
+        const when = m.utcMs === null ? '—' : new Date(m.utcMs).toLocaleTimeString('en-GB');
+        const parts = [`<span class="badge ${modeCls}">mode ${esc(m.mode || '—')}</span>`];
+        parts.push(m.stale
+          ? `<span class="badge bad">stale${m.ageS === null ? '' : ` (${esc(fmt(m.ageS, 0))} s)`}${m.state && m.state !== 'fresh' ? ` · ${esc(m.state)}` : ''}</span>`
+          : `<span class="badge ok">live · ${esc(fmt(m.ageS, 1))} s</span>`);
+        parts.push(`<span class="badge mono" title="utc_ns of the status file">${esc(when)}</span>`);
+        if (fetchError) parts.push(`<span class="badge warn">fetch failed: ${esc(fetchError)}</span>`);
+        // Missing sensor with an abort limit (ACPI zones, nvidia) stays visible; model notes are not shown.
+        const missing = state.sensors.filter(x => x.valueC === null && x.abortC !== null).map(x => x.label);
+        if (missing.length) parts.push(`<span class="badge bad">sensor missing: ${esc(missing.join(', '))}</span>`);
+        if (m.reason) parts.push(`<span class="badge" title="status.reason">${esc(m.reason)}</span>`);
+        el.innerHTML = parts.join('');
+      }
+
+      function summaryLine(state) {
+        const b = state.balance, m = state.meta;
+        if (m.stale) return `stale${m.ageS === null ? '' : ` (${fmt(m.ageS, 0)} s)`} · last values dimmed`;
+        return `live · cooler ${fmtWh(b.coolerJ)} stored · ${b.state} ${signed(b.storeW)} W · plate ≈ ${fmtC(r1(state.nodes.plate.tempC))}`;
+      }
+
+      return Object.freeze({ CONST: K, CPU_MODEL, buildTwinState, render, renderSummary, renderMeta, summaryLine });
+    })();
+    // ==== tw-pure end ====
+
+    // Twin glue: poll only while the section is open and the page is visible (every ~2 s).
+    (() => {
+      const details = $('tw-details'); if (!details) return;
+      const POLL_MS = 2000;
+      const mount = $('tw-mount'), fig = $('tw-fig'), kpis = $('tw-kpis'), meta = $('tw-meta'), line = $('tw-state');
+      const idleLine = line.textContent;
+      let timer = null, busy = false, last = null;
+      const outer = details.parentElement && details.parentElement.closest('details');  // the Cooling card
+      const active = () => details.open && !document.hidden && (!outer || outer.open);
+      function draw() {
+        if (!last || !last.status) {
+          const why = !last ? 'loading energy_control status …'
+            : last.error ? `dashboard API unreachable (${last.error})` : `energy_control status ${last.state || 'unknown'}`;
+          mount.innerHTML = `<div class="tw-empty">${esc(why)} – no live data.</div>`;
+          kpis.innerHTML = ''; fig.classList.remove('tw-stale');
+          meta.innerHTML = `<span class="badge bad">${esc(why)}</span>`; line.textContent = why;
+          return;
+        }
+        const ageS = last.ageS === null ? null : last.ageS + (Date.now() - last.recvMs) / 1000;
+        const state = TW.buildTwinState(last.status, { ageS, state: last.state });
+        TW.render(state, mount); TW.renderSummary(state, kpis);
+        TW.renderMeta(state, meta, last.error);
+        fig.classList.toggle('tw-stale', state.meta.stale);
+        line.textContent = TW.summaryLine(state);
+      }
+      async function poll() {
+        if (busy) return; busy = true;
+        try {
+          const response = await fetch('api/energy/status', { cache: 'no-store' });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+          last = { status: data && data.status && typeof data.status === 'object' ? data.status : null,
+            state: typeof data?.state === 'string' ? data.state : null,
+            ageS: Number.isFinite(data?.age_s) ? data.age_s : null, recvMs: Date.now(), error: null };
+        } catch (error) {
+          last = { ...(last || { status: null, state: null, ageS: null, recvMs: Date.now() }), error: error.message || String(error) };
+        } finally { busy = false; }
+        if (active()) draw();
+      }
+      function stop() { if (timer) { clearInterval(timer); timer = null; } if (!details.open) line.textContent = idleLine; }
+      function sync() {
+        if (!active()) { stop(); return; }
+        if (!timer) { poll(); timer = setInterval(() => { if (active()) poll(); else stop(); }, POLL_MS); }
+      }
+      details.addEventListener('toggle', sync);
+      if (outer) outer.addEventListener('toggle', sync);  // 'toggle' does not bubble
+      document.addEventListener('visibilitychange', sync);
+    })();
+  </script>
+</body>
+</html>

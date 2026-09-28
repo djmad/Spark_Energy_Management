@@ -1,0 +1,61 @@
+{
+  "cpu_control": "cluster",
+  "cpu_derivative_tau_s": 1.0,
+  "cpu_e0_max_mhz": 2808,
+  "cpu_e1_max_mhz": 2808,
+  "cpu_entry_ratio": 0.5,
+  "cpu_fast_max_mhz": 3900,
+  "cpu_idle_down_ratio_s": 0.1,
+  "cpu_kd": 0.06,
+  "cpu_ki": 0.012,
+  "cpu_kp": 0.075,
+  "cpu_p0_max_mhz": 3900,
+  "cpu_p1_max_mhz": 3900,
+  "cpu_recovery_ratio_s": 0.03,
+  "cpu_slow_max_mhz": 2808,
+  "cpu_target_c": 92.0,
+  "cpu_tracking_tau_s": 2.0,
+  "fan_curve": [
+    [
+      70,
+      3
+    ],
+    [
+      85,
+      5
+    ],
+    [
+      90,
+      6
+    ],
+    [
+      91,
+      9
+    ],
+    [
+      92,
+      12
+    ]
+  ],
+  "fan_idle_delay_s": 300.0,
+  "fan_load_state": 12,
+  "fan_min_state": 6,
+  "fan_policy": "predictive",
+  "fan_preferred_state": 6,
+  "gpu_busy_threshold": 0.75,
+  "gpu_derivative_tau_s": 3.0,
+  "gpu_entry_mhz": 1700,
+  "gpu_kd": 0.04,
+  "gpu_ki": 0.006,
+  "gpu_kp": 0.06,
+  "gpu_max_mhz": 2200,
+  "gpu_ramp_down_mhz_s": 150.0,
+  "gpu_ramp_up_mhz_s": 100.0,
+  "gpu_target_c": 78.0,
+  "gpu_tracking_tau_s": 2.0,
+  "guard_margin_c": 2.0,
+  "pid_integrator": "conditional",
+  "priority_cpu": 1.0,
+  "priority_gpu": 1.0,
+  "tuning": []
+}

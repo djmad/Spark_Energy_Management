@@ -1,0 +1,42 @@
+# Installed by scripts/install-energy-control.sh from reviewed code in /opt/spark-energy.
+# Sole owner of the GPU clock ceiling, CPU maxima and additive fan floor (goal v2).
+# Start only after the legacy writers are stopped and masked (doc/41-handoff-runbook.md).
+[Unit]
+Description=Spark Energy controller (GPU ceiling, CPU maxima, fan floor owner)
+Documentation=file:/opt/spark-energy/doc/41-handoff-runbook.md
+After=local-fs.target nvidia-persistenced.service
+Wants=nvidia-persistenced.service
+# One writer per actuator: systemd never runs a legacy owner alongside this one.
+Conflicts=spark-cpu-thermal-guard.service dgx-fan-max.service
+# An abort no longer ends the process: the service holds the safe state,
+# keeps publishing and re-arms in-process after cooling (doc/53). A process
+# exit (crash, >30 aborts in 10 min) restarts here; a burst of those must not
+# leave the machine without its controller (live 27 September 2026: five
+# restarts in 10 min hit the old limit).
+StartLimitIntervalSec=600
+StartLimitBurst=30
+
+[Service]
+Type=exec
+WorkingDirectory=/opt/spark-energy
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B -m energy_control.service
+# An abort leaves the owners' safe state (GPU 200-500 MHz, CPU minimum, fan 12);
+# the service stays up, publishes SAFE_STATE, waits for cooling and re-arms.
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+StateDirectory=spark-energy
+StateDirectoryMode=0700
+# The guard, sampler and owners must not be starved by LLM or research load.
+Nice=-10
+UMask=0022
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

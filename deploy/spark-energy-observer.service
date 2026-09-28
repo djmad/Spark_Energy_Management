@@ -1,0 +1,33 @@
+# STAGED ONLY. Install reviewed code under /opt/spark-energy first.
+# Read-only telemetry/API service; not the hardware controller or safety guard.
+[Unit]
+Description=Spark Energy read-only telemetry observer (unqualified shadow mode)
+Documentation=file:/opt/spark-energy/doc/11-shadow-observer.md
+After=local-fs.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=exec
+DynamicUser=yes
+WorkingDirectory=/opt/spark-energy
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B -m energy_control.observer --port 18765 --interval 2
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=no
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

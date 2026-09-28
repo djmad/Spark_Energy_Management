@@ -1,0 +1,14 @@
+[Unit]
+Description=ThinkStation PGX / DGX Spark fixed maximum fan floor
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/dgx-fan-control set-state 12
+ExecStop=/usr/local/sbin/dgx-fan-control automatic
+TimeoutStartSec=45
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

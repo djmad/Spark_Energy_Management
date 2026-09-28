@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Release evidence archives (uploaded to the GitHub release by hand, never committed)
+release/
+*.zip
+*.zip.sha256
+
+# Run data and traces (live under /var/lib/spark-energy on the machine)
+*.jsonl
+!doc/**/*.jsonl
+traces/
+service-runs/
+commissioning-runs/
+trial-traces/
+
+# Local-only material: legacy installers and third-party snapshots (see AGENTS.md: never execute),
+# operator screenshots, agent session state
+Archive/
+spark layout*.png
+.claude/
+CLAUDE.md
+
+# Secrets and local configuration (never commit)
+.env
+*.env
+operator-password*.json
+config.json
+*.key
+*.pem
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
