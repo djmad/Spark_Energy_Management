@@ -471,3 +471,89 @@ End state at the claim release (11:41): energy_control is running
 with the committed configuration and no override:
 mode RUN, GPU cap 2500 MHz (max 2500), fan floor 12 (predictive), prefill_rearm 0.0, fan_release_step_s 60.0.
 The status API is running and vLLM is resident.
+
+## 10. TGPU hotspot for LLM loads: second refit (28 September, evening)
+
+The operator asked to fix the twin's TGPU check for LLM loads. After the
+§9 change the machine ran hours of LLM at 2.5 GHz with bursts to 70 W, and the
+dashboard's twin predicted TGPU 7–10 K above the measurement in bursts.
+
+**Analysis** (traces 26 September 20:00 to 28 September 18:40, 1 Hz, twin
+residual measured − predicted):
+- **Not a room change.** The case-air sensors (NVMe, Wi-Fi), which sit off the
+  cooler, read the same at the same power as on 27 September. Idle stayed at
+  −0.3 K.
+- **Not the clock or the LLM as such.** LLM below 2 GHz fitted (−0.4 K). LLM at
+  2.3–2.5 GHz ran −3.3 K, and −4.4 K (RMS 5.0) at 40 W or more.
+- **The fit had no long high-power runs.** The morning refit saw high power
+  only in minutes-long burn-ins, where the stores are still charging. Its
+  steady-state rise (TGPU 1.0 K/W at fan 12) was too steep for hours at
+  30–48 W: the LLM measured 0.89 K/W.
+- **A workload share remains.** At the same GPU power the burn-in reads
+  about 2 K hotter on TGPU than LLM decode. Dense matrix work concentrates
+  the heat in the compute units, while LLM decode spreads it over memory and
+  fabric.
+
+**Refit** (`analysis/sink_fit.py`): training 26 September 20:00 to
+28 September 14:00, holdout 28 September from 14:00 (LLM at 2.5 GHz). The
+hotspot term gained the GPU activity:
+
+  TGPU = T_p + (r0 + r1 × a) × P_GPU,
+  a = (P_GPU − 4.5 W) / (P_matmul(f) − 4.5 W)
+
+P_matmul is the burn-in power at the clock (`GB10_GPU_MATMUL_W`, doc/53), so
+a is about 1 for the burn-in and 0.2–0.5 for LLM decode. The activity changes
+only the TGPU observation, not the heat balance.
+
+| Quantity | v1.1 (morning refit) | This fit |
+| --- | --- | --- |
+| Die + contact plate | 32.2 J/K | 23.1 J/K, τ ≈ 8 s |
+| Neck plate → fins | 3.15 W/K | 2.96 W/K |
+| Fin block + case air | 430 J/K | 287 J/K, τ 57 s at fan 12 / 94 s at fan 2 |
+| Fins → room | 2.46 + 2.60 × share W/K | 2.56 + 2.44 × share W/K (5.00 at 12, 3.05 at 2) |
+| Background heat | 16.9 W | 17.7 W |
+| TGPU above the plate | 0.483 K/W × P_GPU | (0.320 + 0.090 × a) K/W × P_GPU |
+| Train / holdout RMS | 1.97 / 3.86 K on this split | 1.70 / 2.04 K (holdout bias 0.3 K) |
+
+The two capacities trade against each other: plate and fin block are still not
+separable. A second fit from other start values (with a slightly different CPU
+power input) gave 24.9 / 317 J/K with the same errors.
+
+Residual by load, measured − twin, with the twin class the dashboards run
+(`energy_control/cooler_twin.py`, fed with the recorded status values):
+
+| Load | Samples | v1.1 mean (RMS) | This fit mean (RMS) |
+| --- | --- | --- | --- |
+| LLM at 2.3–2.5 GHz, 40 W and more | 10 606 | −4.39 K (4.95) | −0.92 K (2.38) |
+| LLM at 2.3–2.5 GHz, all | 14 597 | −3.25 K (3.77) | −0.73 K (2.03) |
+| LLM below 2 GHz | 38 616 | −0.36 K (1.83) | +0.41 K (1.96) |
+| Matrix burn-in, 27 September | 8 174 | +0.16 K (2.17) | +1.13 K (2.34) |
+| Idle | 48 180 | −0.34 K (1.21) | −0.39 K (1.28) |
+| Holdout, 28 September 14:00–18:40 | 14 576 | −3.43 K (4.12) | −0.52 K (2.32) |
+
+Since 10:00 on 28 September, 5 % of samples read more than 7.2 K warm under
+v1.1. With this fit the absolute residual stays within 4.5 K for 95 % of samples.
+
+**Limits.**
+- The burn-in now reads 1.1 K cold (the twin is slightly optimistic for it).
+- The room stays fixed at 21 °C with no live sensor.
+- The predictive fan still uses the first fit's `fan_*` constants (unchanged).
+- The traces of the afternoon of 28 September are not in the v1.0 evidence
+  zip, so the fit reproduces only on this machine's trace directory.
+
+**Changed.**
+- `energy_control/cooler_twin.py`: constants, the activity term (fed with the
+  measured GPU clock), and `hotspot_k_w` and `gpu_activity` in the state.
+- `analysis/sink_fit.py`: new split and activity term.
+- Both dashboard pages: constants, and the effective hotspot shown in the GPU
+  hotspot box.
+- `energy_control` itself does not use the twin; only the dashboards' samplers
+  do.
+
+**Deployed** (build 20260928T191638, 19:16). The package was installed to
+`/opt/spark-energy` and the dashboard service restarted. `energy_control` was not
+restarted: it does not use the twin.
+
+**Live check** (150 s under the running LLM, GPU 39–46 W at 2.5 GHz, activity
+0.40–0.48, effective hotspot 0.356–0.363 K/W): TGPU residual mean +0.35 K,
+largest 1.6 K. Before, it was 7–10 K warm in bursts.

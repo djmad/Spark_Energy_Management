@@ -9,7 +9,8 @@ about 21 C. Model (room fixed at ROOM_C):
   fins   Cf dTf/dt = Gn (Tp - Tf) - Ga(fan) (Tf - T_room)
   Ga(fan) = g0 + g1 * max(0.2, floor / 12)
   P_in   = P_gpu (measured) + P_cpu (power_estimate, calorimetric-v2) + P_bg
-  TGPU   = Tp + r * P_gpu                 (hotspot above the plate)
+  TGPU   = Tp + (r + r1 * a) * P_gpu      (hotspot above the plate)
+  a      = (P_gpu - 4.5) / (P_matmul(f) - 4.5), 0..1.2   (GPU activity)
 
 "fins" lumps the fin block with the case air it heats. P_bg is the constant
 background heat (board, memory, NIC, idle SoC).
@@ -18,9 +19,17 @@ Refit 28 September 2026 over the full power range: training 26-27 September
 (GPU 5-53 W: the night's fan-floor runs at floors 2-12 plus the evening's
 burn-ins), holdout 28 September (incl. an LLM run at 46 W). The first fit
 (night only, 5-26 W) traded background heat against the conductances and ran
-10 K warm at 46 W. Result: energy_control/cooler_twin.py (CoolerParams).
+10 K warm at 46 W.
 
-    python3 -m analysis.sink_fit [trace-dir]    # traces from the evidence zip
+Second refit, 28 September 2026 evening: the morning refit had seen high power
+only in short burn-ins and ran 4.3 K warm on TGPU for hours of LLM at 2.5 GHz
+and 40 W or more. Training now runs to 28 September 14:00 (incl. the day's LLM
+at 2.5 GHz), holdout 28 September from 14:00. The hotspot term gained the GPU
+activity a (P_matmul: simulation.model.GB10_GPU_MATMUL_W, the burn-in's power at
+the clock): dense matrix work sits hotter above the plate per watt than LLM
+decode. Result: energy_control/cooler_twin.py (CoolerParams).
+
+    python3 -m analysis.sink_fit [trace-dir] [--three]   # --three: also the 3-store fit
 """
 from datetime import datetime
 import json
@@ -30,15 +39,25 @@ import statistics as st
 from types import SimpleNamespace
 
 from energy_control.power_estimate import estimate_cpu_power_w
+from simulation.model import GB10_GPU_MATMUL_W
 
 import sys
 
-DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/var/lib/spark-energy/traces")
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+DIR = Path(ARGS[0]) if ARGS else Path("/var/lib/spark-energy/traces")
 ROOM_C = 21.0
+IDLE_GPU_W = 4.5
 ORDER = sorted(range(20), key=lambda i: f"policy{i}")
-TRAIN = ("2026-09-26T20:00:00+02:00", "2026-09-27T23:59:00+02:00")
-HOLDOUT = ("2026-09-28T00:00:00+02:00", "2026-09-28T23:59:00+02:00")
-NAMES = ("Cp", "Cf", "Gn", "g0", "g1", "P_bg", "r")
+TRAIN = ("2026-09-26T20:00:00+02:00", "2026-09-28T13:59:59+02:00")
+HOLDOUT = ("2026-09-28T14:00:00+02:00", "2026-09-28T23:59:00+02:00")
+NAMES = ("Cp", "Cf", "Gn", "g0", "g1", "P_bg", "r", "r1")
+
+
+def activity(gpu_w, mhz):
+    """GPU power as a share of the matrix burn-in's power at this clock."""
+    if not mhz or mhz <= 0:
+        return 0.4
+    return min(1.2, max(0.0, (gpu_w - IDLE_GPU_W) / (GB10_GPU_MATMUL_W(mhz) - IDLE_GPU_W)))
 NAMES3 = ("Cd", "Cp", "Cf", "Gd", "Gn", "g0", "g1", "P_bg", "r")
 
 
@@ -70,22 +89,22 @@ def load(a, b):
                 policies = tuple(SimpleNamespace(index=cpu, measured_mhz=mhz[k]) for k, cpu in enumerate(ORDER))
                 cpu_w = estimate_cpu_power_w(util, policies)
             rows.append((t, r["gpu_w"], cpu_w if cpu_w is not None else 4.5, r["fan_floor"], tgpu,
-                         r.get("mode")))
+                         r.get("mode"), activity(r["gpu_w"], r.get("gpu_mhz"))))
     rows.sort()
     return rows
 
 
 def simulate(p, rows):
-    Cp, Cf, Gn, g0, g1, P_bg, r = p
-    t0, pg, pc, fan, tg, _ = rows[0]
+    Cp, Cf, Gn, g0, g1, P_bg, r, r1 = p
+    t0, pg, pc, fan, tg, _, a = rows[0]
     ga = g0 + g1 * max(0.2, fan / 12)
     p_in = pg + pc + P_bg
     Tf = ROOM_C + p_in / ga
     Tp = Tf + p_in / Gn
-    shift = tg - (Tp + r * pg)          # start from the measured state, keep the split
+    shift = tg - (Tp + (r + r1 * a) * pg)   # start from the measured state, keep the split
     Tp += shift; Tf += shift
     err, prev = [], t0
-    for t, pg, pc, fan, tg, mode in rows:
+    for t, pg, pc, fan, tg, mode, a in rows:
         dt = t - prev
         prev = t
         if dt > 30:                     # gap (restart): keep the state, no integration
@@ -98,14 +117,14 @@ def simulate(p, rows):
             qn = Gn * (Tp - Tf)
             Tp += h * (p_in - qn) / Cp
             Tf += h * (qn - ga * (Tf - ROOM_C)) / Cf
-        err.append(Tp + r * pg - tg)
+        err.append(Tp + (r + r1 * a) * pg - tg)
     return err
 
 
 def simulate3(p, rows):
     """die (Cd) -> plate (Cp) -> neck Gn -> fins/case (Cf) -> room via Ga(fan)."""
     Cd, Cp, Cf, Gd, Gn, g0, g1, P_bg, r = p
-    t0, pg, pc, fan, tg, _ = rows[0]
+    t0, pg, pc, fan, tg, _, _ = rows[0]
     ga = g0 + g1 * max(0.2, fan / 12)
     p_in = pg + pc + P_bg
     Tf = ROOM_C + p_in / ga
@@ -114,7 +133,7 @@ def simulate3(p, rows):
     shift = tg - (Td + r * pg)
     Td += shift; Tp += shift; Tf += shift
     err, prev = [], t0
-    for t, pg, pc, fan, tg, mode in rows:
+    for t, pg, pc, fan, tg, mode, _ in rows:
         dt = t - prev
         prev = t
         if dt > 30:
@@ -145,12 +164,12 @@ def cost3(x, rows):
 
 
 def unpack(x):
-    return [exp(v) for v in x[:6]] + [x[6]]
+    return [exp(v) for v in x[:6]] + list(x[6:8])
 
 
 def cost(x, rows):
     p = unpack(x)
-    if not 0 <= p[6] <= 1.5:
+    if not (0 <= p[6] <= 1.5 and -1.5 <= p[7] <= 1.5):
         return 1e9
     e = simulate(p, rows)
     return (sum(v * v for v in e) / len(e)) ** 0.5
@@ -192,8 +211,8 @@ def main():
     tr = thin(train, 3)
     best = None
     for cf in (400.0, 1500.0):
-        x0 = [log(160.0), log(cf), log(6.0), log(1.5), log(3.0), log(15.0), 0.3]
-        x, v = nelder_mead(lambda x: cost(x, tr), x0, [0.4] * 6 + [0.2])
+        x0 = [log(160.0), log(cf), log(6.0), log(1.5), log(3.0), log(15.0), 0.3, 0.1]
+        x, v = nelder_mead(lambda x: cost(x, tr), x0, [0.4] * 6 + [0.2, 0.1], iters=2000)
         if best is None or v < best[1]:
             best = (x, v)
     p = unpack(best[0])
@@ -210,6 +229,8 @@ def main():
            "plate_to_room_k_per_w_fan12": round(1 / p[2] + 1 / ga12, 3),
            "plate_to_room_k_per_w_fan2": round(1 / p[2] + 1 / ga2, 3)}
     print(json.dumps(out, indent=1))
+    if "--three" not in sys.argv:
+        return
     best3 = None
     for cf in (600.0, 2000.0):
         x0 = [log(20.0), log(150.0), log(cf), log(4.0), log(4.0), log(2.0), log(3.0), log(12.0), 0.3]

@@ -4,10 +4,10 @@ import unittest
 from energy_control.cooler_twin import PARAMS, CoolerTwin, twin_from_status
 
 
-def run(twin, seconds, gpu_w, cpu_w=5.0, floor=12, t0=0.0, tgpu=None):
+def run(twin, seconds, gpu_w, cpu_w=5.0, floor=12, t0=0.0, tgpu=None, mhz=None):
     state = None
     for k in range(int(seconds)):
-        state = twin.update(t0 + k, gpu_w, cpu_w, floor, tgpu)
+        state = twin.update(t0 + k, gpu_w, cpu_w, floor, tgpu, mhz)
     return state
 
 
@@ -63,6 +63,18 @@ class CoolerTwinTests(unittest.TestCase):
         self.assertAlmostEqual(s["tgpu_residual_k"], 71.5 - s["tgpu_predicted_c"], places=1)
         self.assertAlmostEqual(s["out_w"], s["in_w"], delta=0.02 * s["in_w"])
 
+    def test_hotspot_follows_gpu_activity_but_the_balance_does_not(self):
+        # 28 Sep 2026: at the same GPU power, LLM decode at 2.5 GHz sits cooler
+        # above the plate than the matrix burn-in at 1.8 GHz.
+        burn = run(CoolerTwin(), 1500, 46.0, mhz=1800)     # about the matrix power at 1.8 GHz
+        llm = run(CoolerTwin(), 1500, 46.0, mhz=2465)
+        self.assertGreater(burn["gpu_activity"], 0.9)
+        self.assertLess(llm["gpu_activity"], 0.6)
+        self.assertGreater(burn["tgpu_predicted_c"], llm["tgpu_predicted_c"] + 1.0)
+        self.assertEqual((burn["plate_c"], burn["out_w"]), (llm["plate_c"], llm["out_w"]))
+        unknown = run(CoolerTwin(), 1, 46.0)                 # no clock reading: typical LLM activity
+        self.assertEqual(unknown["gpu_activity"], PARAMS.default_activity)
+
     def test_gaps_restart_from_steady_state_and_bad_inputs_are_ignored(self):
         twin = CoolerTwin()
         run(twin, 10, 5.0)
@@ -73,10 +85,11 @@ class CoolerTwinTests(unittest.TestCase):
         self.assertIsNone(twin.update(float("nan"), 40.0, 5.0, 12))
 
     def test_status_payload_feeds_the_twin(self):
-        payload = {"utc_ns": 1_000_000_000_000, "gpu": {"power_w": 46.0}, "cpu": {"est_power_w": 5.0},
-                   "fan": {"floor": 12}, "zones_c": {"TGPU": 71.5}}
+        payload = {"utc_ns": 1_000_000_000_000, "gpu": {"power_w": 46.0, "measured_mhz": 2465.0},
+                   "cpu": {"est_power_w": 5.0}, "fan": {"floor": 12}, "zones_c": {"TGPU": 71.5}}
         s = twin_from_status(CoolerTwin(), payload)
         self.assertEqual(s["in_w"], round(46.0 + 5.0 + PARAMS.background_w, 2))
+        self.assertEqual(s["gpu_activity"], round(PARAMS.activity(46.0, 2465.0), 2))
         self.assertIsNone(twin_from_status(CoolerTwin(), {"gpu": {}}))
         self.assertIsNone(twin_from_status(CoolerTwin(), None))
 

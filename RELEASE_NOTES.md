@@ -1,5 +1,19 @@
 # Release notes
 
+## Unreleased
+
+### Changed
+
+- **Twin: TGPU hotspot fixed for LLM loads.** The cooler model was refit on the evening of
+  28 September. Training now includes hours of LLM at 2.5 GHz, and the hotspot term follows
+  the GPU activity (GPU power as a share of the matrix burn-in's power at that clock).
+  - LLM at 2.3–2.5 GHz and 40 W or more: TGPU residual −0.9 K, before −4.4 K.
+  - Holdout (LLM afternoon): 2.04 K RMS, before 3.9 K.
+  - Burn-in: +1.1 K, before +0.2 K.
+  - New constants: plate 23 J/K, fin block 287 J/K, removal 5.00 W/K at fan 12, background
+    17.7 W, hotspot (0.32 + 0.09 × activity) K/W.
+  - Details in `doc/55-worst-case-temperature-power.md` §10.
+
 ## v1.1 — 28 September 2026
 
 ### Changed

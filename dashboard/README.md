@@ -89,30 +89,45 @@ sampler integrates it from the status file's power inputs and serves the state o
 | Wi-Fi, NVMe | measured | energy_control; reference, not in the control loop |
 | Fan floor and fan speeds | measured | energy_control |
 | CPU power per cluster (~) | estimated | `energy_control/power_estimate.py`, calorimetric v2, scale about ±×2 |
-| Die + contact plate (≈) | model | energy-conserving twin state, integrated from the power inputs; checked against TGPU = plate + 0.483 K/W × P_GPU (residual shown as a note above 3 K) |
+| Die + contact plate (≈) | model | energy-conserving twin state, integrated from the power inputs; checked against TGPU = plate + (0.320 + 0.090 × GPU activity) K/W × P_GPU (residual shown as a note above 3 K) |
 | Fin block + case air (≈) | model | energy-conserving twin state (no sensor) |
 | Heat balance | model | input = removal + charge at every step; removal = input in steady state |
-| Background heat 16.9 W | fitted | board, RAM, NIC, idle SoC |
+| Background heat 17.7 W | fitted | board, RAM, NIC, idle SoC |
 | Room air 21 °C | measured once | at the intake; no live sensor |
 
 **Fitted cooler constants** (`analysis/sink_fit.py`, two-store fit with the
-room air fixed at 21 °C, refit 28 September 2026 over the full power range: training
-26–27 September, GPU 5–53 W, fan floors 2–12, RMS 1.34 K; holdout 28 September,
-1.95 K):
+room air fixed at 21 °C, refit on the evening of 28 September 2026: training
+26 September 20:00 to 28 September 14:00, GPU 5–53 W, fan floors 2–12, burn-ins and
+hours of LLM at 2.5 GHz, RMS 1.70 K; holdout 28 September from 14:00, LLM at 2.5 GHz,
+2.04 K, bias 0.3 K):
 
 | Part | Value |
 | --- | --- |
-| Die + primary contact plate (fast store) | C = 32 J/K ≈ 84 g Cu, τ ≈ 10 s |
-| Neck, plate → fin block | G = 3.15 W/K |
-| Fin block + case air (main store) | C = 430 J/K ≈ 480 g Al, τ ≈ 85 s at fan 12, 144 s at fan 2 |
-| Fin block → room air | G = 2.46 + 2.60 × max(0.2, floor/12) W/K (5.06 at fan 12, 2.98 at fan 2) |
-| TGPU hotspot | 0.483 K/W × P_GPU above the die/plate node |
-| Background heat | 16.9 W |
+| Die + primary contact plate (fast store) | C = 23 J/K ≈ 60 g Cu, τ ≈ 8 s |
+| Neck, plate → fin block | G = 2.96 W/K |
+| Fin block + case air (main store) | C = 287 J/K ≈ 320 g Al, τ ≈ 57 s at fan 12, 94 s at fan 2 |
+| Fin block → room air | G = 2.56 + 2.44 × max(0.2, floor/12) W/K (5.00 at fan 12, 3.05 at fan 2) |
+| TGPU hotspot | (0.320 + 0.090 × a) K/W × P_GPU above the die/plate node |
+| Background heat | 17.7 W |
 
-Known limit: the GPU power reading carries a load's heat differently per workload. The
-memory-heavy matrix burn-in heats the die more per reported GPU watt than LLM decode, so
-for LLM loads at the same GPU power the model runs about 7 K warm on TGPU. The heat
-balance is unaffected; the residual is shown as a model-check note.
+**GPU activity** a = (P_GPU − 4.5 W) / (P_matmul(f) − 4.5 W), from 0 to 1.2. P_matmul(f)
+is the measured matrix burn-in power at the GPU clock f (`GB10_GPU_MATMUL_W`), so a is
+about 1 for the burn-in and 0.2–0.5 for LLM decode. Dense matrix work concentrates the
+heat in the compute units, so TGPU sits higher above the plate per watt. The term changes
+only the TGPU check, not the heat balance. The twin reports the effective K/W and a with
+each sample, and the GPU hotspot box shows them.
+
+Residual (measured − twin TGPU), 26–28 September:
+
+| Load | v1.1 fit | This fit |
+| --- | --- | --- |
+| LLM at 2.3–2.5 GHz, 40 W and more | −4.4 K (RMS 5.0) | −0.9 K (RMS 2.4) |
+| LLM below 2 GHz | −0.4 K | +0.4 K |
+| Matrix burn-in (27 September) | +0.2 K | +1.1 K |
+| Idle | −0.3 K | −0.4 K |
+
+A larger residual means a load unlike the fitted ones or a changed room temperature
+(no live room sensor).
 
 Earlier cool-down time constants of 130–240 s are a slow case component that
 the fit cannot separate.

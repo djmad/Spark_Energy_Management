@@ -437,31 +437,34 @@
        *       measured = hardware measurement; assumed = no measurement behind it
        * Model: plate  C_p dT_p/dt = P_in − G_n (T_p − T_f)
        *        fins   C_f dT_f/dt = G_n (T_p − T_f) − G_a(floor) (T_f − T_room)
-       *        G_a(floor) = g0 + g1 × max(0.2, floor / 12);  TGPU = T_p + r × P_GPU
+       *        G_a(floor) = g0 + g1 × max(0.2, floor / 12);  TGPU = T_p + (r0 + r1 × a) × P_GPU
+       *        a = GPU activity = (P_GPU − 4.5 W) / (P_matmul(f) − 4.5 W), about 1 for the burn-in, 0.2–0.5 for LLM
        * (CPU power: calorimetric-v2, doc/55 §6); the three-part cooler follows the operator's teardown photo (27 Sep 2026). */
       const K = Object.freeze({
-        fitLabel: 'fitted 28 Sep 2026 (5–53 W, holdout 1.95 K)',
+        fitLabel: 'fitted 28 Sep 2026 (5–53 W, LLM at 2.5 GHz; holdout 2.04 K)',
         fitShort: 'fitted',
         ambientC: 21.0,          // measured: room air at the intake (operator, ~22:45); no live sensor
         ambientNote: 'measured 22:45',
-        // GPU die sensors. fitted: TGPU sits r × P_GPU above the die/plate node (the fit's observation model)
-        hotspotKW: 0.483,        // fitted, K/W: TGPU ≈ plate + 0.483 × P_GPU (model check, not the balance)
+        // GPU die sensors. fitted: TGPU sits (r0 + r1 × activity) × P_GPU above the die/plate node (the fit's observation model)
+        hotspotKW: 0.320,        // fitted r0, K/W at activity 0; the twin reports the effective value (model check, not the balance)
+        hotspotActKW: 0.090,     // fitted r1, K/W added at activity 1 (matrix burn-in): dense matrix work sits hotter
+        defaultActivity: 0.4,    // without the twin: typical LLM decode
         gnodeWK: 1.9,            // older two-node fit (gpu_twin GB10_FIT): nvidia − P_GPU / 1.9 = cross-check / fallback
         // (1) Die + primary copper plate on the GB10 die (GPU and CPU clusters): the fast store. fitted
-        plateJK: 32.2,           // fitted 28 Sep over 5–53 W (27 Sep night-only fit: 28 J/K)
+        plateJK: 23.1,           // fitted 28 Sep evening incl. hours of LLM at 2.5 GHz (morning refit 32.2, night-only 28 J/K)
         copperJgK: 0.385,        // specific heat of Cu, J/(g·K): Cu-equivalent mass = C / c
         // (2) Neck: small cross-section joining plate and fin block, a thermal bottleneck. fitted
-        neckWK: 3.15,            // fitted; plate τ = C_p / G_n ≈ 10 s
+        neckWK: 2.96,            // fitted; plate τ = C_p / G_n ≈ 8 s
         // (3) Fin block (black anodised fins, probably Al) + the case air it heats: the main store. fitted
-        finsJK: 430,             // fitted; τ = C_f / G_a ≈ 85 s at fan 12, 144 s at fan 2
+        finsJK: 287,             // fitted; τ = C_f / G_a ≈ 57 s at fan 12, 94 s at fan 2
         aluminiumJgK: 0.897,     // specific heat of Al, J/(g·K): Al-equivalent mass = C / c
-        airBaseWK: 2.46,         // fitted: fins -> room air, fan-independent part, W/K
-        airFanWK: 2.60,          // fitted: × max(0.2, floor / 12); 5.06 W/K at fan 12, 2.98 at fan 2
+        airBaseWK: 2.56,         // fitted: fins -> room air, fan-independent part, W/K
+        airFanWK: 2.44,          // fitted: × max(0.2, floor / 12); 5.00 W/K at fan 12, 3.05 at fan 2
         fanMinShare: 0.2,        // max(0.2, floor / 12); fitted range floors 2–12
         slowTauS: [130, 240],    // earlier cool-downs: slow part (case), not separable in the fit (notes only)
         // (4) Background heat: board, RAM, ConnectX NIC (own Cu plate, heatpipe into the fins), idle SoC. fitted;
         //     booked into the plate as in the fit (P_in). The NIC share is unknown.
-        backgroundW: 16.9,       // fitted over 5–53 W (the night-only fit traded it off: 12.3 W)
+        backgroundW: 17.7,       // fitted over 5–53 W (the night-only fit traded it off: 12.3 W)
         // Fans: index into status fan.rpm. Mapping derived from the RPM at floor 12 ([9000, 13500]).
         fanLeftSlowIdx: 0,       // left, NIC side, slow (~9000 rpm)
         fanRightFastIdx: 1,      // right, near CPU/GPU, fast (~13500 rpm)
@@ -594,14 +597,17 @@
         const tw = opts.twin && Number.isFinite(opts.twin.plate_c) && Number.isFinite(opts.twin.fins_c) ? opts.twin : null;
         const inW = tw ? tw.in_w : inParts.every(v => v !== null) ? inParts.reduce((a, v) => a + v, 0) : null;
 
-        /* ---- (1) Die + primary plate (fast store): the fit's observation model TGPU = T_p + 0.52 K/W × P_GPU,
-         *      so T_p ≈ TGPU − 0.52 × P_GPU. Cross-check (older two-node fit): nvidia − P_GPU / 1.9. ---- */
+        /* ---- (1) Die + primary plate (fast store): the fit's observation model TGPU = T_p + r(a) × P_GPU,
+         *      so T_p ≈ TGPU − r(a) × P_GPU; r(a) = r0 + r1 × GPU activity, reported by the twin.
+         *      Cross-check (older two-node fit): nvidia − P_GPU / 1.9. ---- */
         const tgpuC = num(zones.TGPU);
-        const plateFromTgpu = (tgpuC !== null && gpuW !== null) ? tgpuC - K.hotspotKW * gpuW : null;
+        const hotKW = tw && Number.isFinite(tw.hotspot_k_w) ? tw.hotspot_k_w : K.hotspotKW + K.hotspotActKW * K.defaultActivity;
+        const gpuActivity = tw && Number.isFinite(tw.gpu_activity) ? tw.gpu_activity : null;
+        const plateFromTgpu = (tgpuC !== null && gpuW !== null) ? tgpuC - hotKW * gpuW : null;
         const plateFromNvidia = (nvidiaC !== null && gpuW !== null) ? nvidiaC - gpuW / K.gnodeWK : null;
         const plateSensorC = plateFromTgpu !== null ? plateFromTgpu : plateFromNvidia;
         const plateC = tw ? tw.plate_c : plateSensorC;
-        if (tw && Number.isFinite(tw.tgpu_residual_k) && Math.abs(tw.tgpu_residual_k) > 3) notes.push(`Model check: TGPU measured ${fmt(tw.tgpu_measured_c, 1)} °C, twin predicts ${fmt(tw.tgpu_predicted_c, 1)} °C (${signed(tw.tgpu_residual_k)} K). The GPU power reading carries the load's heat differently per workload (memory-heavy burn-in vs. LLM decode); the heat balance stays energy-conserving.`);
+        if (tw && Number.isFinite(tw.tgpu_residual_k) && Math.abs(tw.tgpu_residual_k) > 3) notes.push(`Model check: TGPU measured ${fmt(tw.tgpu_measured_c, 1)} °C, twin predicts ${fmt(tw.tgpu_predicted_c, 1)} °C (${signed(tw.tgpu_residual_k)} K). The hotspot term follows the GPU activity (a ${fmt(gpuActivity, 2)}); a larger residual means a load unlike the fitted ones or a changed room temperature. The heat balance stays energy-conserving.`);
         const plateSource = tw ? 'twin' : plateFromTgpu !== null ? 'tgpu' : plateFromNvidia !== null ? 'nvidia' : null;
         const crossK = (plateFromTgpu !== null && plateFromNvidia !== null) ? plateFromNvidia - plateFromTgpu : null;
         if (plateSource === 'nvidia') notes.push('TGPU missing: plate estimated from nvidia − P/1.9 instead (older two-node model).');
@@ -697,7 +703,7 @@
         }
         const off = clusters.filter(c => c.residualK !== null && Math.abs(c.residualK) > 6);
         if (off.length) {
-          notes.push(`Measurement differs from the twin: ${off.map(c => `${ZONE_OF[c.name]} ${fmt(num(zones[ZONE_OF[c.name]]), 1)} °C measured vs. ${fmt(c.twinC, 1)} °C model (${signed(c.residualK)} K)`).join('; ')}. Possible causes: the plate estimate (TGPU − ${fmt(K.hotspotKW, 2)} K/W × P) or GPU→CPU coupling in the package that the twin does not model; the zone gains come from cluster_twin (older copper model).`);
+          notes.push(`Measurement differs from the twin: ${off.map(c => `${ZONE_OF[c.name]} ${fmt(num(zones[ZONE_OF[c.name]]), 1)} °C measured vs. ${fmt(c.twinC, 1)} °C model (${signed(c.residualK)} K)`).join('; ')}. Possible causes: the plate estimate (TGPU − ${fmt(hotKW, 2)} K/W × P) or GPU→CPU coupling in the package that the twin does not model; the zone gains come from cluster_twin (older copper model).`);
         }
         const cpuMaxW = CPU_MODEL.baseW + Object.values(CPU_MODEL.clusters).reduce((a, m) => a + m.fullW, 0);
         if (estTotal !== null && estTotal > cpuMaxW) {
@@ -740,7 +746,7 @@
         /* ---- Heat flows (quasi-stationary inside the fast GPU chain and CPU zones) ---- */
         const flows = [
           { id: 'src-gpu', from: 'GPU power', to: 'GPU die', w: gpuW, kind: 'measured' },
-          { id: 'die-plate', from: 'GPU die (TGPU)', to: 'contact plate', w: gpuW, kind: 'measured', conductanceWK: 1 / K.hotspotKW },
+          { id: 'die-plate', from: 'GPU die (TGPU)', to: 'contact plate', w: gpuW, kind: 'measured', conductanceWK: 1 / hotKW },
           ...clusters.flatMap(c => [
             { id: `src-${c.name}`, from: `Cluster ${c.name}`, to: `Zone ${c.name}`, w: c.powerW, kind: 'estimated' },
             { id: `z${c.name}-plate`, from: `Zone ${c.name}`, to: 'contact plate', w: c.powerW, kind: 'estimated' },
@@ -769,6 +775,7 @@
             plateSteadyC, finsSteadyC, dPlateK, dFinsK, ambientC, twin: tw,
             finsRateKs: tw ? tw.fins_charge_w / K.finsJK : storeW === null ? null : storeW / K.finsJK },
           cpu: { totalW: cpuTotalW, source: cpuSource, scale, modelVersion: CPU_MODEL.version },
+          hotspot: { kW: hotKW, activity: gpuActivity },
           notes,
         };
       }
@@ -943,7 +950,7 @@
         const fitIdx = K.fitLabel.indexOf(' ('), fitA = fitIdx < 0 ? K.fitLabel : K.fitLabel.slice(0, fitIdx), fitB = fitIdx < 0 ? '' : K.fitLabel.slice(fitIdx + 1);
         arrow(F['src-gpu'], L.src.x + L.src.w, gRow, L.zone.x, N.die.tgpuC, N.die.tgpuC, null);
         arrow(F['die-plate'], L.gnode.x + L.gnode.w, gRow, P.x, N.die.tgpuC, N.plate.tempC,
-          { sub: `${fmt(K.hotspotKW, 2)} K/W` });
+          { sub: `${fmt(state.hotspot.kW, 2)} K/W` });
         for (const c of DISPLAY_CLUSTERS) {
           const y = cy(c), zn = N['z' + c];
           arrow(F[`src-${c}`], L.src.x + L.src.w, y, L.zone.x, zn.tempC, zn.tempC, null);
@@ -961,13 +968,13 @@
         /* ---- GPU die: TGPU and nvidia measure the die, which the fit lumps into the fast store ---- */
         const G = L.rows.gpu, D = N.die, dx = L.zone.x, dw = L.gnode.x + L.gnode.w - L.zone.x, half = dw / 2;
         const tCol = tempColor(D.tgpuC), nCol = tempColor(D.nvidiaC);
-        g.push(`<g><title>${esc(`GPU die: TGPU ${fmtC(D.tgpuC)} and nvidia ${fmtC(D.nvidiaC)} measure the die. The fit lumps die and contact plate into the fast store (${K.plateJK} J/K): TGPU = plate + ${fmt(K.hotspotKW, 2)} K/W × P_GPU (${K.fitLabel}). nvidia − P/${fmt(K.gnodeWK, 1)} is the cross-check from the older two-node model.`)}</title>`
+        g.push(`<g><title>${esc(`GPU die: TGPU ${fmtC(D.tgpuC)} and nvidia ${fmtC(D.nvidiaC)} measure the die. The fit lumps die and contact plate into the fast store (${K.plateJK} J/K): TGPU = plate + (${fmt(K.hotspotKW, 3)} + ${fmt(K.hotspotActKW, 3)} × activity) K/W × P_GPU = ${fmt(state.hotspot.kW, 2)} K/W now (GPU activity ${fmt(state.hotspot.activity, 2)}: GPU power over the matrix burn-in's power at this clock; ${K.fitLabel}). nvidia − P/${fmt(K.gnodeWK, 1)} is the cross-check from the older two-node model.`)}</title>`
           + `<rect x="${dx}" y="${G.y}" width="${dw}" height="${G.h}" rx="10" fill="${tempFill(D.tgpuC)}" stroke="${tCol}" stroke-width="1.6"/></g>`
           + `<line x1="${dx + half}" x2="${dx + half}" y1="${G.y + 8}" y2="${G.y + G.h - 8}" class="tw-line" stroke-dasharray="3 3"/>`
           + txt('tw-title', dx + 10, G.y + 18, 'GPU hotspot')
           + pin(S.TGPU, dx + half - 14, G.y + 13) + `<text class="tw-mono" x="${dx + half - 10}" y="${G.y + 40}" text-anchor="end">TGPU</text>`
           + `<text class="tw-big" x="${dx + 10}" y="${G.y + 41}" fill="${tCol}">${esc(fmtC(D.tgpuC))}</text>`
-          + txt('tw-sm', dx + 10, G.y + 57, `= plate + ${fmt(K.hotspotKW, 2)} K/W × P`)
+          + txt('tw-sm', dx + 10, G.y + 57, `= plate + ${fmt(state.hotspot.kW, 2)} K/W × P`)
           + txt('tw-fit', dx + 10, G.y + 72, `${K.fitShort} ${fitB}`)
           + txt('tw-sm', dx + 10, G.y + 87, `target ≤ ${fmt(D.tgpuSetpointC, 0)} °C (zone)`)
           + txt('tw-title', dx + half + 10, G.y + 18, 'GPU sensor')
@@ -994,7 +1001,7 @@
         const pCol = tempColor(N.plate.tempC), px = P.x + 10;
         const twS = state.balance.twin;
         const pBasis = twS ? `twin · TGPU check ${Number.isFinite(twS.tgpu_residual_k) ? signed(twS.tgpu_residual_k) + ' K' : '—'}`
-          : N.plate.source === 'nvidia' ? `nvidia − P/${fmt(K.gnodeWK, 1)}` : `TGPU − ${fmt(K.hotspotKW, 2)}·P`;
+          : N.plate.source === 'nvidia' ? `nvidia − P/${fmt(K.gnodeWK, 1)}` : `TGPU − ${fmt(state.hotspot.kW, 2)}·P`;
         const balCol = b.state === 'charging' ? AMBER : b.state === 'discharging' ? '#83a8ff' : b.state === 'unknown' ? '#a2afc0' : '#57e3c3';
         g.push(`<g><title>${esc(`Die + primary contact plate (fast store; the die carries the GPU and the CPU clusters) ≈ ${fmtC(r1(N.plate.tempC))}, estimated: ${pBasis}. C = ${K.plateJK} J/K, ${K.fitLabel} · E = C × (T − T_room)`)}</title>`
           + `<rect x="${P.x}" y="${P.y}" width="${P.w}" height="${P.h}" rx="12" fill="${tempFill(N.plate.tempC, 0.2)}" stroke="${pCol}" stroke-width="1.8" stroke-dasharray="7 4"/></g>`

@@ -48,14 +48,16 @@ jump can cause.
 - **What it models.** Heat from its sources (GPU, the four CPU clusters, background:
   board, memory, NIC) through the die and contact plate, across a narrow neck into the fin
   block, and out to the room air through the fans.
-- **How it was fitted.** On fan-floor runs from level 2 to 12, with the room temperature
-  measured.
-  - Die and plate: 32 J/K.
-  - Fin block and case: 430 J/K.
-  - Heat removal to the room: 5.06 W/K at fan 12, 2.98 W/K at fan 2.
-  - Background heat (board, memory, NIC): 16.9 W.
-  - Holdout error: 1.95 K over GPU 5–53 W; LLM loads run about 7 K warm on TGPU
-    (the GPU power reading carries each workload's heat differently).
+- **How it was fitted.** On fan-floor runs from level 2 to 12, burn-ins, and hours of
+  LLM at 2.5 GHz, with the room temperature measured.
+  - Die and plate: 23 J/K.
+  - Fin block and case: 287 J/K.
+  - Heat removal to the room: 5.00 W/K at fan 12, 3.05 W/K at fan 2.
+  - Background heat (board, memory, NIC): 17.7 W.
+  - GPU hotspot above the plate: 0.32 K/W plus 0.09 K/W × GPU activity, i.e. GPU power
+    as a share of the matrix burn-in's power at that clock. Dense matrix work sits hotter
+    per watt than LLM decode.
+  - Holdout error: 2.04 K RMS on an afternoon of LLM at 2.5 GHz (bias 0.3 K).
 - **How it is used.** The predictive fan and the power balance use it. New controller
   settings are evaluated in the closed-loop twin (`simulation/fan_twin.py`) before they go
   live.
