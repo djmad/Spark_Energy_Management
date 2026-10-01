@@ -95,20 +95,22 @@ sampler integrates it from the status file's power inputs and serves the state o
 | Background heat 17.7 W | fitted | board, RAM, NIC, idle SoC |
 | Room air 21 °C | measured once | at the intake; no live sensor |
 
-**Fitted cooler constants** (`analysis/sink_fit.py`, two-store fit with the
-room air fixed at 21 °C, refit on the evening of 28 September 2026: training
-26 September 20:00 to 28 September 14:00, GPU 5–53 W, fan floors 2–12, burn-ins and
-hours of LLM at 2.5 GHz, RMS 1.70 K; holdout 28 September from 14:00, LLM at 2.5 GHz,
-2.04 K, bias 0.3 K):
+**Fitted cooler constants.** Calorimetry of 1 October 2026 after the heatsink swap with
+new thermal pads (`scripts/calorimetry_cooler.sh`, `analysis/calorimetry_fit.py`,
+`doc/58-calorimetry-new-cooler.md`):
+- Two-store fit with the room air fixed at 21 °C.
+- GPU burn-in at 1500, 2000 and 2500 MHz at fan 12 (up to 81 W), and at 1500 MHz with the
+  fan fixed at 2. RMS 1.20 K.
+- Holdout: 1500 MHz at fan 6, 1.33 K, bias 0.75 K.
 
 | Part | Value |
 | --- | --- |
-| Die + primary contact plate (fast store) | C = 23 J/K ≈ 60 g Cu, τ ≈ 8 s |
-| Neck, plate → fin block | G = 2.96 W/K |
-| Fin block + case air (main store) | C = 287 J/K ≈ 320 g Al, τ ≈ 57 s at fan 12, 94 s at fan 2 |
-| Fin block → room air | G = 2.56 + 2.44 × max(0.2, floor/12) W/K (5.00 at fan 12, 3.05 at fan 2) |
-| TGPU hotspot | (0.320 + 0.090 × a) K/W × P_GPU above the die/plate node |
-| Background heat | 17.7 W |
+| Die + primary contact plate (fast store) | C = 27 J/K, τ ≈ 7 s; not identifiable from TGPU (15–90 J/K fit within 0.1 K) |
+| Neck, plate → fin block | G = 4.13 W/K (2.96 before the swap) |
+| Fin block + case air (main store) | C = 261 J/K ≈ 290 g Al, τ ≈ 46 s at fan 12, 94 s at fan 2 |
+| Fin block → room air | G = 2.05 + 3.59 × max(0.2, floor/12) W/K (5.64 at fan 12, 2.77 at fan 2) |
+| TGPU hotspot | (0.0 + 0.090 × a) K/W × P_GPU above the die/plate node |
+| Background heat | 24.8 W (includes the room's offset from 21 °C: 1 K ≈ 2.4 W) |
 
 **GPU activity** a = (P_GPU − 4.5 W) / (P_matmul(f) − 4.5 W), from 0 to 1.2. P_matmul(f)
 is the measured matrix burn-in power at the GPU clock f (`GB10_GPU_MATMUL_W`), so a is
@@ -117,14 +119,21 @@ heat in the compute units, so TGPU sits higher above the plate per watt. The ter
 only the TGPU check, not the heat balance. The twin reports the effective K/W and a with
 each sample, and the GPU hotspot box shows them.
 
-Residual (measured − twin TGPU), 26–28 September:
+Residual (measured − twin TGPU) on the calorimetry run, with the old cooler's constants
+and with this fit:
 
-| Load | v1.1 fit | This fit |
+| Block | Old constants | This fit |
 | --- | --- | --- |
-| LLM at 2.3–2.5 GHz, 40 W and more | −4.4 K (RMS 5.0) | −0.9 K (RMS 2.4) |
-| LLM below 2 GHz | −0.4 K | +0.4 K |
-| Matrix burn-in (27 September) | +0.2 K | +1.1 K |
-| Idle | −0.3 K | −0.4 K |
+| GPU 1500 / 2000 / 2500 MHz, fan 12 | −14.5 / −21.7 / −35.4 K | −1.0 / +0.9 / −0.5 K |
+| GPU 1500 MHz, fan 6 / fan 2 | −11.3 / −10.4 K | +0.1 / +0.2 K |
+| CPU burn-in (P, E, all cores, P at 2600 MHz) | −1.8 … +0.8 K | +2.9 … +4.5 K |
+| Whole run | RMS 13.9 K | RMS 2.1 K |
+
+Under pure CPU load the twin reads 3–4.5 K cold: the CPU power estimate (calorimetric-v2)
+misses heat that TGPU sees. That heat probably comes from the uncore or fabric: TUNC also
+rises with the E cores alone. The CPU model stays unchanged until a better reference
+exists. The LLM activity term (0.090 K/W) comes from the old cooler's LLM data and is not
+yet re-checked on the new cooler.
 
 A larger residual means a load unlike the fitted ones or a changed room temperature
 (no live room sensor).

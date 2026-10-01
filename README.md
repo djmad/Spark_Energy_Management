@@ -48,16 +48,20 @@ jump can cause.
 - **What it models.** Heat from its sources (GPU, the four CPU clusters, background:
   board, memory, NIC) through the die and contact plate, across a narrow neck into the fin
   block, and out to the room air through the fans.
-- **How it was fitted.** On fan-floor runs from level 2 to 12, burn-ins, and hours of
-  LLM at 2.5 GHz, with the room temperature measured.
-  - Die and plate: 23 J/K.
-  - Fin block and case: 287 J/K.
-  - Heat removal to the room: 5.00 W/K at fan 12, 3.05 W/K at fan 2.
-  - Background heat (board, memory, NIC): 17.7 W.
-  - GPU hotspot above the plate: 0.32 K/W plus 0.09 K/W × GPU activity, i.e. GPU power
-    as a share of the matrix burn-in's power at that clock. Dense matrix work sits hotter
-    per watt than LLM decode.
-  - Holdout error: 2.04 K RMS on an afternoon of LLM at 2.5 GHz (bias 0.3 K).
+- **How it was fitted.** Calorimetrically, after the heatsink swap with new thermal pads
+  (1 October 2026). The GPU served as the reference heater: burn-in at 1500, 2000 and
+  2500 MHz at fan 12, and at 1500 MHz with the fan fixed at 6 and 2
+  (`scripts/calorimetry_cooler.sh`, `analysis/calorimetry_fit.py`). Room air taken as 21 °C.
+  - Plate to room: 0.42 K/W at fan 12 (0.54 before the swap). Neck plate → fin block
+    4.13 W/K (2.96 before).
+  - Fin block and case: 261 J/K. Heat removal to the room: 5.64 W/K at fan 12, 2.77 W/K
+    at fan 2.
+  - Die and plate: 27 J/K, but TGPU cannot determine it: anything from 15 to 90 J/K fits
+    within 0.1 K.
+  - Background heat (board, memory, NIC): 24.8 W, including the room's offset from 21 °C.
+  - GPU hotspot above the plate: 0.09 K/W × GPU activity, i.e. GPU power as a share of the
+    matrix burn-in's power at that clock.
+  - Error: 1.2 K RMS on fans 12 and 2; holdout at fan 6: 1.33 K.
 - **How it is used.** The predictive fan and the power balance use it. New controller
   settings are evaluated in the closed-loop twin (`simulation/fan_twin.py`) before they go
   live.

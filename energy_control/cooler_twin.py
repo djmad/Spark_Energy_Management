@@ -1,8 +1,9 @@
 """Energy-conserving cooler twin for the dashboards (pure, no device I/O).
 
-Two stores in series (analysis/sink_fit.py, refit 28 September 2026 evening
-with the day's long LLM runs at 2.5 GHz: GPU 5-53 W, fan floors 2-12, room air
-measured 21 C):
+Two stores in series. Calorimetry of 1 October 2026 after the operator swapped
+the heatsink and fitted new thermal pads (scripts/calorimetry_cooler.sh,
+analysis/calorimetry_fit.py: GPU burn-in 1500/2000/2500 MHz at fan 12, 1500 MHz
+at fans 2 and 6; room air taken as 21 C):
 
   plate  Cp dTp/dt = P_in - Gn (Tp - Tf)                  die + contact plate
   fins   Cf dTf/dt = Gn (Tp - Tf) - Ga(fan) (Tf - T_room)  fin block + case air
@@ -39,17 +40,17 @@ def _finite(value):
 
 @dataclass(frozen=True)
 class CoolerParams:
-    version: str = "fitted 28 Sep 2026 evening (5-53 W, floors 2-12, LLM at 2.5 GHz; holdout 2.04 K)"
-    plate_j_k: float = 23.1        # die + contact plate (fast store)
-    fins_j_k: float = 287.0        # fin block + case air (main store)
-    neck_w_k: float = 2.96         # plate -> fin block
-    air_base_w_k: float = 2.56     # fin block -> room, fan-independent
-    air_fan_w_k: float = 2.44      # fin block -> room, x max(0.2, floor / 12)
+    version: str = "calorimetry 1 Oct 2026, new cooler (5-81 W, fans 2/6/12; holdout fan 6 1.33 K)"
+    plate_j_k: float = 27.0        # die + contact plate (fast store); not identifiable from TGPU: 15-90 fit alike
+    fins_j_k: float = 261.0        # fin block + case air (main store)
+    neck_w_k: float = 4.13         # plate -> fin block (new cooler and pads; 2.96 before)
+    air_base_w_k: float = 2.05     # fin block -> room, fan-independent
+    air_fan_w_k: float = 3.59      # fin block -> room, x max(0.2, floor / 12)
     fan_min_share: float = 0.2
-    background_w: float = 17.7     # board, RAM, NIC (heatpipe), idle SoC
+    background_w: float = 24.8     # board, RAM, NIC (heatpipe), idle SoC; absorbs the room's offset from 21 C
     room_c: float = 21.0           # intake air, measured by the operator (no live sensor)
-    hotspot_k_w: float = 0.320     # TGPU above the plate per GPU watt at activity 0
-    hotspot_act_k_w: float = 0.090  # added per GPU watt at activity 1 (matrix burn-in)
+    hotspot_k_w: float = 0.0       # TGPU above the plate per GPU watt at activity 0 (fit at its bound)
+    hotspot_act_k_w: float = 0.090  # added per GPU watt at activity 1 (matrix burn-in; LLM refit 28 Sep)
     idle_gpu_w: float = 4.5        # GPU power at idle (the matrix fit's offset)
     default_activity: float = 0.4  # without a clock reading (typical LLM decode)
 

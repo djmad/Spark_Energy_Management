@@ -441,30 +441,30 @@
        *        a = GPU activity = (P_GPU − 4.5 W) / (P_matmul(f) − 4.5 W), about 1 for the burn-in, 0.2–0.5 for LLM
        * (CPU power: calorimetric-v2, doc/55 §6); the three-part cooler follows the operator's teardown photo (27 Sep 2026). */
       const K = Object.freeze({
-        fitLabel: 'fitted 28 Sep 2026 (5–53 W, LLM at 2.5 GHz; holdout 2.04 K)',
+        fitLabel: 'calorimetry 1 Oct 2026, new cooler (5–81 W, fans 2/6/12; holdout 1.33 K)',
         fitShort: 'fitted',
         ambientC: 21.0,          // measured: room air at the intake (operator, ~22:45); no live sensor
         ambientNote: 'measured 22:45',
         // GPU die sensors. fitted: TGPU sits (r0 + r1 × activity) × P_GPU above the die/plate node (the fit's observation model)
-        hotspotKW: 0.320,        // fitted r0, K/W at activity 0; the twin reports the effective value (model check, not the balance)
-        hotspotActKW: 0.090,     // fitted r1, K/W added at activity 1 (matrix burn-in): dense matrix work sits hotter
+        hotspotKW: 0.0,          // fitted r0, K/W at activity 0 (new pads: at the fit's bound); the twin reports the effective value
+        hotspotActKW: 0.090,     // r1, K/W added at activity 1 (matrix burn-in; LLM refit 28 Sep): dense matrix work sits hotter
         defaultActivity: 0.4,    // without the twin: typical LLM decode
         gnodeWK: 1.9,            // older two-node fit (gpu_twin GB10_FIT): nvidia − P_GPU / 1.9 = cross-check / fallback
         // (1) Die + primary copper plate on the GB10 die (GPU and CPU clusters): the fast store. fitted
-        plateJK: 23.1,           // fitted 28 Sep evening incl. hours of LLM at 2.5 GHz (morning refit 32.2, night-only 28 J/K)
+        plateJK: 27.0,           // calorimetry 1 Oct; TGPU cannot pin it: 15–90 J/K fit within 0.1 K (old cooler 23–32)
         copperJgK: 0.385,        // specific heat of Cu, J/(g·K): Cu-equivalent mass = C / c
         // (2) Neck: small cross-section joining plate and fin block, a thermal bottleneck. fitted
-        neckWK: 2.96,            // fitted; plate τ = C_p / G_n ≈ 8 s
+        neckWK: 4.13,            // fitted (new cooler and pads; 2.96 before); plate τ = C_p / G_n ≈ 7 s
         // (3) Fin block (black anodised fins, probably Al) + the case air it heats: the main store. fitted
-        finsJK: 287,             // fitted; τ = C_f / G_a ≈ 57 s at fan 12, 94 s at fan 2
+        finsJK: 261,             // fitted; τ = C_f / G_a ≈ 46 s at fan 12, 94 s at fan 2
         aluminiumJgK: 0.897,     // specific heat of Al, J/(g·K): Al-equivalent mass = C / c
-        airBaseWK: 2.56,         // fitted: fins -> room air, fan-independent part, W/K
-        airFanWK: 2.44,          // fitted: × max(0.2, floor / 12); 5.00 W/K at fan 12, 3.05 at fan 2
+        airBaseWK: 2.05,         // fitted: fins -> room air, fan-independent part, W/K
+        airFanWK: 3.59,          // fitted: × max(0.2, floor / 12); 5.64 W/K at fan 12, 2.77 at fan 2
         fanMinShare: 0.2,        // max(0.2, floor / 12); fitted range floors 2–12
         slowTauS: [130, 240],    // earlier cool-downs: slow part (case), not separable in the fit (notes only)
         // (4) Background heat: board, RAM, ConnectX NIC (own Cu plate, heatpipe into the fins), idle SoC. fitted;
         //     booked into the plate as in the fit (P_in). The NIC share is unknown.
-        backgroundW: 17.7,       // fitted over 5–53 W (the night-only fit traded it off: 12.3 W)
+        backgroundW: 24.8,       // fitted 1 Oct; absorbs the room's offset from 21 °C (1 K ≈ 2.4 W)
         // Fans: index into status fan.rpm. Mapping derived from the RPM at floor 12 ([9000, 13500]).
         fanLeftSlowIdx: 0,       // left, NIC side, slow (~9000 rpm)
         fanRightFastIdx: 1,      // right, near CPU/GPU, fast (~13500 rpm)

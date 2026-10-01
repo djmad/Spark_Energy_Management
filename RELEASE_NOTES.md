@@ -14,6 +14,19 @@
     17.7 W, hotspot (0.32 + 0.09 × activity) K/W.
   - Details in `doc/55-worst-case-temperature-power.md` §10.
 
+- **Twin: recalibrated after the heatsink swap.** The operator replaced the heatsink and
+  fitted new thermal pads; a calorimetric run measured the new cooler. The GPU served as
+  the reference heater: burn-in at 1500, 2000 and 2500 MHz at fan 12, and at 1500 MHz at
+  fans 6 and 2.
+  - Plate to room: 0.42 K/W at fan 12, against 0.54 K/W before. Neck: 4.13 W/K, against
+    2.96.
+  - Twin error on the run: 2.1 K RMS, against 13.9 K with the old constants (which ran up
+    to 35 K warm at 2500 MHz).
+  - The plate's heat capacity (the copper amount) cannot be determined from TGPU: anything
+    from 15 to 90 J/K fits within 0.1 K.
+  - The CPU model and the predictive fan's own cooler constants are unchanged.
+  - Details in `doc/58-calorimetry-new-cooler.md`.
+
 ### Fixed
 
 - **energy_control no longer reads vLLM.** Each in-process run restart leaked a 1 Hz
