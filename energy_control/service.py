@@ -574,13 +574,25 @@ def status_payload(readout, applied, limits, config, run_id, board, control=None
             "control": control, "clocks": clocks}
 
 
-def _signals(readout, queue, demand, cluster_util=None):
+def _signals(readout, demand, cluster_util=None):
+    """Policy inputs from the host readout. Load is GPU utilisation only: the
+    service reads nothing from vLLM (operator, 1 October 2026: vLLM is not
+    always available and no longer relevant for energy control)."""
     cpu = readout.cpu_util_pct
     return dict(gpu_util_pct=readout.gpu.utilization_pct, cpu_util_pct=cpu,
                 cpu_demand_active=demand(cpu), cluster_util_pct=cluster_util,
                 gpu_power_w=getattr(readout.gpu, "reported_power_w", None),
-                cpu_power_w=estimate_cpu_power_w(cluster_util, getattr(readout, "cpu_policies", ())),
-                **queue(readout.active_jobs, readout.queued_jobs))
+                cpu_power_w=estimate_cpu_power_w(cluster_util, getattr(readout, "cpu_policies", ())))
+
+
+def _close_trace(trace):
+    """Close a run's trace writer; measurement logging never affects control."""
+    if trace is None:
+        return
+    try:
+        trace.close()
+    except (OSError, ValueError, AttributeError):
+        pass
 
 
 def run_service(config, *, runs_dir, readiness_path, thermal, gpu_factory, cpu_factory,
@@ -593,13 +605,12 @@ def run_service(config, *, runs_dir, readiness_path, thermal, gpu_factory, cpu_f
 
     ``config`` is the committed configuration; ``live_override`` (LiveOverride)
     adds boot-bound test settings on top, live, without a restart."""
-    from .collector import VllmTokenCounters, service_collector
-    from .live import QueueSignals
+    from .collector import service_collector
     if guard_source_factory is None:
         guard_source_factory = partial(guard_host_source, collector_factory=service_collector)
     owner_epoch = owner_epoch or "svc-" + uuid4().hex[:16]
     epoch = epoch_fn()
-    supervisor = broker = None
+    supervisor = broker = trace = None
     base = config
     if live_override is not None:
         live_override.poll()
@@ -636,11 +647,10 @@ def run_service(config, *, runs_dir, readiness_path, thermal, gpu_factory, cpu_f
                 except Exception as exc:  # The broker never affects control.
                     log(f"operator broker unavailable: {type(exc).__name__}: {exc}")
                     broker = None
-            queue, demand = QueueSignals(), CpuDemand()
+            demand = CpuDemand()
             vendor = VendorWatch()
             clocks = None
-            trace = (TraceWriter(trace_dir, token_counters=VllmTokenCounters())
-                     if trace_dir is not None else None)
+            trace = TraceWriter(trace_dir) if trace_dir is not None else None
             next_status = 0.0
             last_logged, last_log_at = None, 0.0
             next_epoch = monotonic() + epoch_check_s
@@ -673,7 +683,7 @@ def run_service(config, *, runs_dir, readiness_path, thermal, gpu_factory, cpu_f
                         except (ValueError, TypeError) as exc:
                             log(f"live override not applied: {type(exc).__name__}: {exc}")
                 limits = supervisor.tick(**_signals(
-                    readout, queue, demand,
+                    readout, demand,
                     trace.last_cluster_util if trace is not None else None))
                 if committed is not None:
                     from .operator_broker import service_readback
@@ -720,6 +730,7 @@ def run_service(config, *, runs_dir, readiness_path, thermal, gpu_factory, cpu_f
                                     control=supervisor.policy.control_state(), clocks=clocks)
                     except (OSError, ValueError, TypeError, AttributeError) as exc:
                         log(f"trace disabled: {type(exc).__name__}: {exc}")
+                        _close_trace(trace)
                         trace = None  # Measurement logging never affects control.
                 if monotonic() >= next_epoch:
                     if epoch_fn() != epoch:
@@ -736,6 +747,10 @@ def run_service(config, *, runs_dir, readiness_path, thermal, gpu_factory, cpu_f
             return 1
         finally:
             remove_readiness(readiness_path)
+            # One trace writer per run: close it here, or every in-process
+            # restart leaks its file (and, until 1 October 2026, a 1 Hz vLLM
+            # /metrics poller thread: 292 threads after 285 restarts).
+            _close_trace(trace)
             if broker is not None:
                 broker[0].shutdown()
                 broker[0].server_close()
@@ -772,7 +787,7 @@ def main(argv=None):
     for number in (signal.SIGTERM, signal.SIGINT):
         signal.signal(number, lambda *_: stop.set())
     SERVICE_RUNS.mkdir(mode=0o700, parents=True, exist_ok=True)
-    source = HostSamplerProcess(collector_factory=partial(service_collector, vllm_queue=True))
+    source = HostSamplerProcess(collector_factory=service_collector)   # no vLLM queue poll
     source.start()
     try:
         thermal = HostSafetySampler(source)

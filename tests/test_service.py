@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import inspect
+import threading
 from threading import Event, Thread, Timer
 from time import monotonic, sleep
 import unittest
@@ -57,7 +59,7 @@ class ServiceLoopTests(unittest.TestCase):
         (self.base / "temps").write_text("60 50\n")
         self.readiness = self.base / "run" / "entry-ceiling"
 
-    def run_service(self, stop, epoch_fn=lambda: "driver-a"):
+    def run_service(self, stop, epoch_fn=lambda: "driver-a", **extra):
         return run_service(
             Config(fan_min_state=0), runs_dir=self.base / "runs", readiness_path=self.readiness,
             thermal=ReadoutThermal(self.base / "temps"),
@@ -65,7 +67,18 @@ class ServiceLoopTests(unittest.TestCase):
             cpu_factory=partial(fake_cpu_owner, str(self.base / "cpufreq"), (2808, 3900)),
             fan_factory=partial(fake_fan_owner, str(self.base / "thermal")),
             boot=BOOT_ID, epoch_fn=epoch_fn, stop=stop, owner_epoch="owner-a",
-            guard_source_factory=partial(fake_guard_source, str(self.base / "temps")))
+            guard_source_factory=partial(fake_guard_source, str(self.base / "temps")), **extra)
+
+    def stop_after_readiness(self, stop, hold_s=0.6):
+        def probe():
+            deadline = monotonic() + 5
+            while monotonic() < deadline and not self.readiness.exists():
+                sleep(.05)
+            sleep(hold_s)
+            stop.set()
+        watcher = Thread(target=probe)
+        watcher.start()
+        return watcher
 
     def assert_safe_state(self):
         self.assertEqual(cpu_maxima(self.base / "cpufreq"), {"slow": {338}, "fast": {1378}})
@@ -94,6 +107,44 @@ class ServiceLoopTests(unittest.TestCase):
         self.assertEqual(records[1]["proposal"]["stage"], 8)
         gpu = [r["maximum_mhz"] for r in records if r["kind"] == "gpu_setter_intent"]
         self.assertEqual((gpu[0], gpu[-1]), (1200, 500))
+
+    def test_runs_never_poll_vllm_and_close_their_trace(self):
+        # Fix request 1 October 2026: every in-process run restart leaked a
+        # 1 Hz vLLM /metrics poller with its trace writer (292 threads after
+        # 285 restarts; vLLM's accept queue filled). Operator: vLLM is not
+        # always available and no longer relevant for energy control.
+        from unittest import mock
+        from energy_control import collector, service
+        closed, rows = [], {"fail": False}
+        before = set(threading.enumerate())       # other tests' pollers may still run
+
+        class RecordingTrace(service.TraceWriter):
+            def write(self, *args, **kwargs):      # rows need a full host readout
+                if rows["fail"]:
+                    raise ValueError("trace row unavailable")
+
+            def close(self):
+                closed.append(self)
+                super().close()
+
+        def no_vllm(*args, **kwargs):
+            raise AssertionError("the service must not poll vLLM")
+
+        with mock.patch.object(service, "TraceWriter", RecordingTrace), \
+                mock.patch.object(collector, "VllmTokenCounters", no_vllm), \
+                mock.patch.object(collector, "BackgroundQueueTelemetry", no_vllm):
+            for fail in (False, True):             # run end, then "trace disabled"
+                rows["fail"], stop = fail, Event()
+                watcher = self.stop_after_readiness(stop)
+                self.assertEqual(self.run_service(stop, trace_dir=self.base / "trace"), 0)
+                watcher.join(5)
+                self.assertEqual(len(closed), 2 if fail else 1)
+        self.assertFalse([t.name for t in set(threading.enumerate()) - before
+                          if t.name.startswith("vllm") and t.is_alive()])
+        for function in (service.main, service.run_service, service._signals):
+            source = inspect.getsource(function)
+            for name in ("VllmTokenCounters", "QueueSignals", "vllm_queue"):
+                self.assertNotIn(name, source, function.__name__)
 
     def test_driver_epoch_change_aborts_to_safe_state(self):
         stop, calls = Event(), []

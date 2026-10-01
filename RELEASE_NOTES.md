@@ -14,6 +14,17 @@
     17.7 W, hotspot (0.32 + 0.09 × activity) K/W.
   - Details in `doc/55-worst-case-temperature-power.md` §10.
 
+### Fixed
+
+- **energy_control no longer reads vLLM.** Each in-process run restart leaked a 1 Hz
+  `/metrics` poller with its trace writer, because no one closed the writer. After about
+  290 restarts in two days, vLLM's accept queue filled and its HTTP front end answered in
+  about 11 s, so every vLLM consumer saw it as down.
+  - The service now reads nothing from vLLM: no queue gauges, no token counters. Load is
+    GPU utilisation only.
+  - Each run closes its trace writer, including when tracing is disabled.
+  - Details in `doc/57-vllm-poller-leak.md`.
+
 ## v1.1 — 28 September 2026
 
 ### Changed

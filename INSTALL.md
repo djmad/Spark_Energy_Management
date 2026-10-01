@@ -15,8 +15,8 @@ python3 -m unittest discover -s tests    # everything passes without hardware
 ```
 
 - PyTorch with CUDA is only needed for the GPU burn-in in `tools/burnin/`.
-- vLLM is optional: when it serves on 127.0.0.1:8000, a new prompt re-arms the GPU entry
-  ceiling before its prefill.
+- No LLM server is needed. energy_control detects load by GPU utilisation only and reads
+  nothing from vLLM or any other workload.
 
 ## 2. Fan driver
 

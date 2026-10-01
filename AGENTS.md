@@ -87,6 +87,10 @@ stopping the services that own them. Every other agent stays read-only.
   at idle the cap returns to the entry ceiling, and a new load ramps from
   there once the GPU is busy. A prompt that joins a running load does not
   re-arm the entry ceiling (`prefill_rearm` 0; 1 only for owned trials).
+  The service reads nothing from vLLM (operator, 1 October 2026: "das vllm
+  ist nicht immer verfügbar.. und es ist in keiner weise mehr relevant für
+  die energiesteuerung. ausschliesslich relevant ist die nun verwendete gpu
+  auslastung"). Only the owned trial tools may contact vLLM.
 - Ramp up only in small, slow steps. Never catch up missed steps.
 - Never deliberately reproduce the power-supply shutdown.
 
