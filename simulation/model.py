@@ -14,7 +14,7 @@ def clamp(value, low, high):
 
 
 PID_INTEGRATORS = ("conditional", "tracking")
-FAN_POLICIES = ("load", "staging", "predictive")
+FAN_POLICIES = ("load", "staging", "predictive", "twin")
 
 
 @dataclass(frozen=True)
@@ -278,6 +278,35 @@ class Settings:
     # release to lower speeds was too aggressive: 12 -> 6 within 90 s between
     # prefill bursts, a sawtooth). 60 s: 12 -> 6 takes 6 min.
     fan_release_step_s: float = 60.0
+    # Twin fan (fan_policy "twin"; operator, 6 October 2026: the fans ran at 12
+    # 85 % of the time for 29 W of LLM load and stepped back to 12 within
+    # minutes; "Sweet Spot wären 70 Grad", fewer revolutions for the bearings,
+    # steadier temperatures). Model-based against the cooler twin of the new
+    # heatsink (energy_control/cooler_twin.py, calorimetry 1 Oct 2026, doc/58):
+    #   the twin's two stores run online from the measured powers and the
+    #     actual floor; a slow bias (measured TGPU - twin) absorbs the room and
+    #     model offset (no room sensor);
+    #   the level is the lowest whose steady TGPU for the smoothed power
+    #     (rise tau fan_twin_rise_s, fall tau fan_twin_fall_s; heat integrates
+    #     in the fin block over 50-100 s, so 10-60 s LLM bursts do not count
+    #     at their peak) stays at fan_temp_target_c;
+    #   up at once to that level (not to 12), down one level per
+    #     fan_release_step_s and only while the next lower level's steady TGPU
+    #     stays fan_twin_down_margin_c below the target (hysteresis);
+    #   feedback as "predictive" but in a narrower band (fan_twin_fb_band_c),
+    #     12 near an abort. Clock loops, targets and aborts are unchanged.
+    fan_temp_target_c: float = 70.0      # steady TGPU (ACPI GPU zone) the fan aims at
+    fan_twin_neck_w_k: float = 4.13      # plate -> fin block (new cooler, doc/58)
+    fan_twin_air_g0_w_k: float = 2.05    # fin block -> room, fan-independent
+    fan_twin_air_g1_w_k: float = 3.59    # fin block -> room per fan share (floor / 12, min 0.2)
+    fan_twin_background_w: float = 24.8  # board, RAM, NIC, idle SoC; absorbs the room's offset from 21 C
+    fan_twin_hotspot_k_w: float = 0.06   # TGPU above the plate per GPU watt (0.09 x activity; LLM 0.2-0.5, matmul 1)
+    fan_twin_rise_s: float = 45.0       # ~ the fin block's tau (46-94 s): a 30 s burst counts at ~half
+    fan_twin_fall_s: float = 120.0
+    fan_twin_down_margin_c: float = 3.0
+    fan_twin_bias_tau_s: float = 600.0
+    fan_twin_bias_max_c: float = 8.0
+    fan_twin_fb_band_c: float = 6.0
     # Operator per-cluster maxima (E0, P0, E1, P1) as ratios of each class's
     # hardware span; each cluster loop treats its value as a bound, so a raise
     # ramps in the loop's controlled way and a reduction applies at once.
@@ -382,7 +411,7 @@ class Settings:
         if type(self.balance) is not bool or type(self.entry_fallback) is not bool:
             raise ValueError("explicit boolean balance / entry-fallback flags required")
         if self.fan_policy not in FAN_POLICIES:
-            raise ValueError("fan policy must be 'load' or 'staging'")
+            raise ValueError(f"fan policy must be one of {', '.join(FAN_POLICIES)}")
         if not 1.0 <= self.guard_margin_c <= 3.0:
             raise ValueError("guard margin must be 1..3 C below the abort")
         if (type(self.cluster_max_ratio) is not tuple or len(self.cluster_max_ratio) != 4
@@ -405,6 +434,11 @@ class Settings:
                 or not 0 <= self.fan_fb_full_c < self.fan_fb_band_c or self.fan_anticipate_s < 0 \
                 or self.fan_background_w < 0 or not self.fan_room_c < self.fan_plate_target_c:
             raise ValueError("invalid predictive fan settings")
+        if not (self.fan_room_c + 10 <= self.fan_temp_target_c <= 80
+                and 0 <= self.fan_twin_down_margin_c <= 15 and 0 < self.fan_twin_bias_max_c <= 15
+                and self.fan_twin_rise_s <= self.fan_twin_fall_s
+                and self.fan_fb_full_c < self.fan_twin_fb_band_c):
+            raise ValueError("invalid twin fan settings")
         if self.cpu_entry_ratio > 1:
             raise ValueError("CPU entry ratio must be <= 1")
         if (type(self.cpu_reservation_ratio) not in (int, float)
@@ -615,6 +649,11 @@ class Supervisor:
         self.fan_gpu_was_active = False
         self.fan_down_s = 0.0
         self.fan_info = {}
+        # Twin fan state: the cooler's two stores, smoothed power, bias.
+        self.fan_twin_plate = self.fan_twin_fins = None
+        self.fan_twin_power_w = None
+        self.fan_twin_gpu_w = 0.0
+        self.fan_twin_bias = 0.0
 
     def _fault(self, reason):
         s = self.s
@@ -780,6 +819,79 @@ class Supervisor:
         self.fan_info = {"expected_w": round(expected, 1), "feed": feed, "feedback": back,
                          "target": target, "pressure": round(pressure, 2),
                          "anticipating": anticipating}
+
+    def _twin_air(self, level):
+        s = self.s
+        return s.fan_twin_air_g0_w_k + s.fan_twin_air_g1_w_k * max(0.2, min(12, level) / 12)
+
+    def _twin_steady_tgpu(self, p_in, p_gpu, level):
+        """Steady TGPU at a fan level for the total heat ``p_in`` (incl. background)."""
+        s = self.s
+        return (s.fan_room_c + p_in * (1 / s.fan_twin_neck_w_k + 1 / self._twin_air(level))
+                + s.fan_twin_hotspot_k_w * max(0.0, p_gpu) + self.fan_twin_bias)
+
+    def _twin_fan(self, o, dt, near_abort, headroom_terms):
+        """Fan level against the cooler twin (fan_policy "twin"); see Settings. Pure."""
+        s = self.s
+        gpu_w = o.gpu_w if o.gpu_w is not None and isfinite(o.gpu_w) and o.gpu_w >= 0 else None
+        cpu_w = o.cpu_w if o.cpu_w is not None and isfinite(o.cpu_w) and o.cpu_w >= 0 else 0.0
+        if gpu_w is None:
+            gpu_w = gpu_power_w(self.twin, self.cap, o.gpu_util)   # twin fallback
+        p_in = gpu_w + cpu_w + s.fan_twin_background_w
+        # Online twin: two stores at the actual floor (zero-order hold).
+        g_air, gn = self._twin_air(self.fan_state), s.fan_twin_neck_w_k
+        if self.fan_twin_plate is None:
+            self.fan_twin_fins = s.fan_room_c + p_in / g_air
+            self.fan_twin_plate = self.fan_twin_fins + p_in / gn
+        else:
+            q_neck = gn * (self.fan_twin_plate - self.fan_twin_fins)
+            self.fan_twin_plate += dt * (p_in - q_neck) / 27.0
+            self.fan_twin_fins += dt * (q_neck - g_air * (self.fan_twin_fins - s.fan_room_c)) / 261.0
+        tgpu = o.gpu_zone[0] if o.gpu_zone is not None and isfinite(o.gpu_zone[0]) else None
+        if tgpu is not None:
+            residual = tgpu - (self.fan_twin_plate + s.fan_twin_hotspot_k_w * gpu_w)
+            a = 1 - exp(-dt / s.fan_twin_bias_tau_s)
+            self.fan_twin_bias = clamp(self.fan_twin_bias + a * (residual - self.fan_twin_bias),
+                                       -s.fan_twin_bias_max_c, s.fan_twin_bias_max_c)
+        # Smoothed heat: fast rise, slow fall.
+        if self.fan_twin_power_w is None:
+            self.fan_twin_power_w, self.fan_twin_gpu_w = p_in, gpu_w
+        tau = s.fan_twin_rise_s if p_in > self.fan_twin_power_w else s.fan_twin_fall_s
+        a = 1 - exp(-dt / tau)
+        self.fan_twin_power_w += a * (p_in - self.fan_twin_power_w)
+        self.fan_twin_gpu_w += a * (gpu_w - self.fan_twin_gpu_w)
+        power, pg = self.fan_twin_power_w, self.fan_twin_gpu_w
+        ceiling = max(s.fan_min_state, min(12, s.fan_load_state))
+        feed = next((level for level in range(s.fan_min_state, ceiling + 1)
+                     if self._twin_steady_tgpu(power, pg, level) <= s.fan_temp_target_c), ceiling)
+        # Feedback: as "predictive", in the twin's narrower band.
+        pressure = 0.0
+        span = max(0.5, s.fan_twin_fb_band_c - s.fan_fb_full_c)
+        for projection, setpoint in headroom_terms:
+            if projection is None or setpoint is None or not isfinite(projection):
+                continue
+            pressure = max(pressure, clamp((projection - (setpoint - s.fan_twin_fb_band_c)) / span, 0.0, 1.0))
+        back = int(-(-12 * pressure // 1))
+        target = max(s.fan_min_state, min(ceiling, max(feed, back)))
+        if near_abort:
+            target = 12
+        if target > self.fan_state:
+            self.fan_state, self.fan_down_s = target, 0.0
+        else:
+            lower = self.fan_state - 1
+            may_drop = (target < self.fan_state and lower >= s.fan_min_state and back <= lower
+                        and self._twin_steady_tgpu(power, pg, lower)
+                        <= s.fan_temp_target_c - s.fan_twin_down_margin_c)
+            self.fan_down_s = self.fan_down_s + dt if may_drop else 0.0
+            if self.fan_down_s >= s.fan_release_step_s:
+                self.fan_state, self.fan_down_s = lower, 0.0
+        self.fan_state = max(s.fan_min_state, min(12, self.fan_state))
+        self.fan_info = {"expected_w": round(power - s.fan_twin_background_w, 1), "feed": feed,
+                         "feedback": back, "target": target, "pressure": round(pressure, 2),
+                         "anticipating": False,
+                         "steady_tgpu_c": round(self._twin_steady_tgpu(power, pg, self.fan_state), 1),
+                         "target_c": s.fan_temp_target_c, "bias_c": round(self.fan_twin_bias, 2),
+                         "twin_plate_c": round(self.fan_twin_plate, 1)}
 
     def _workload_costs(self, o):
         """Per-watt cut costs from the detected workloads and their priorities."""
@@ -1056,6 +1168,15 @@ class Supervisor:
                 terms.append((o.cpu_projected_c, self.cpu_setpoint))
             gpu_work = o.model_loading or o.gpu_util >= s.busy_threshold   # utilisation only (28 Sep)
             self._predictive_fan(o, dt, gpu_work, near_abort, terms)
+        elif s.fan_policy == "twin":
+            terms = [(projected_cpu, self.cpu_setpoint), (projected_gpu, s.gpu_target_c)]
+            if o.gpu_zone is not None:
+                terms.append((o.gpu_zone[1], self.gpu_zone_loop.setpoint))
+            if o.cpu_zones is not None:
+                terms += [(zone[1], loop.setpoint) for zone, loop in zip(o.cpu_zones, self.clusters)]
+            if o.cpu_projected_c is not None:
+                terms.append((o.cpu_projected_c, self.cpu_setpoint))
+            self._twin_fan(o, dt, near_abort, terms)
         elif s.fan_policy == "load":
             loaded = working or o.model_loading or o.cpu_demand_active is True
             self._load_fan(dt, loaded, near_abort)

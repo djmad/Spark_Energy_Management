@@ -4,6 +4,22 @@
 
 ### Changed
 
+- **Fan: new policy "twin" against the new cooler's twin.** The predictive fan
+  still used the first cooler fit and a 300 s peak-hold of the power, so it held
+  fan 12 for 85 % of the time at 29 W of LLM load and bounced back after every
+  burst.
+  - The twin fan runs the doc/58 cooler online and learns a slow TGPU bias.
+  - It aims at a steady TGPU of 70 °C (`fan_temp_target_c`) for a smoothed power
+    (45 s rise, 120 s fall).
+  - It rises only to the level needed and releases one level per minute, with
+    3 K of hysteresis.
+  - Feedback works in a 6 K band; near an abort the fan goes to 12.
+  - 6 h replay: fan mean 2.2 instead of 11.3, 1.7 changes per hour, TGPU max
+    70 °C.
+  - Deploy with `scripts/deploy-twin-fan.sh`, roll back with
+    `scripts/rollback-twin-fan.sh`.
+  - Details in `doc/59-twin-fan.md`.
+
 - **Twin: TGPU hotspot fixed for LLM loads.** The cooler model was refit on the evening of
   28 September. Training now includes hours of LLM at 2.5 GHz, and the hotspot term follows
   the GPU activity (GPU power as a share of the matrix burn-in's power at that clock).

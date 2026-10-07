@@ -79,6 +79,14 @@ TUNABLES = {
     "fan_neck_w_k": (1.0, 10.0), "fan_air_g0_w_k": (0.5, 5.0), "fan_air_g1_w_k": (0.2, 6.0),
     "fan_room_c": (10.0, 40.0), "fan_background_w": (0.0, 40.0),
     "fan_anticipate_s": (0.0, 120.0), "fan_power_decay_s": (5.0, 900.0), "fan_release_step_s": (5.0, 300.0),
+    # Twin fan (fan_policy "twin", 6 October 2026): target, the new cooler's
+    # constants (doc/58), power smoothing, hysteresis, bias and feedback band.
+    "fan_temp_target_c": (50.0, 78.0),
+    "fan_twin_neck_w_k": (1.0, 10.0), "fan_twin_air_g0_w_k": (0.5, 6.0), "fan_twin_air_g1_w_k": (0.2, 8.0),
+    "fan_twin_background_w": (0.0, 60.0), "fan_twin_hotspot_k_w": (0.0, 0.5),
+    "fan_twin_rise_s": (2.0, 120.0), "fan_twin_fall_s": (10.0, 900.0),
+    "fan_twin_down_margin_c": (0.5, 10.0), "fan_twin_bias_tau_s": (30.0, 3600.0),
+    "fan_twin_bias_max_c": (1.0, 15.0), "fan_twin_fb_band_c": (4.0, 25.0),
     # REARM to the entry ceiling on each new prefill: 0 = off (operator, 28 Sep
     # 2026: load is detected by GPU utilisation only), 1 = on, e.g. for owned
     # cold-to-prefill qualification trials through the live override.
@@ -124,7 +132,7 @@ def normalize_tuning(value):
 CPU_CLUSTER_MAX_FIELDS = ("cpu_e0_max_mhz", "cpu_p0_max_mhz", "cpu_e1_max_mhz",
                           "cpu_p1_max_mhz")
 CPU_CONTROLS = ("cluster", "class")
-FAN_POLICIES = ("load", "staging", "predictive")
+FAN_POLICIES = ("load", "staging", "predictive", "twin")
 PID_INTEGRATORS = ("conditional", "tracking")
 
 
